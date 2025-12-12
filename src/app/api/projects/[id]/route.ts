@@ -48,11 +48,8 @@ export async function GET(
         console.warn(`Failed to get domain from NPM for ${projectName}: ${error}`);
       }
 
-      // Get status - only if domain exists, otherwise mark as Error
-      let status: "Running" | "Stopped" | "Error" = "Error";
-      if (domain) {
-        status = await getProjectStatus(projectName);
-      }
+      // Get status regardless of domain
+      const status = await getProjectStatus(projectName);
 
       const project: Project = {
         id: projectName,

@@ -70,15 +70,12 @@ export async function GET() {
             console.warn(`Failed to get domain from NPM for ${dir.name}: ${error}`);
           }
 
-          // Get status - only if domain exists, otherwise mark as Error
+          // Get status regardless of domain
           const hasDatabase = projectSubDirs.some(
             (d) => d.isDirectory() && d.name === "database"
           );
           
-          let status: "Running" | "Stopped" | "Error" = "Error";
-          if (domain) {
-            status = await getProjectStatus(dir.name);
-          }
+          const status = await getProjectStatus(dir.name);
 
           projects.push({
             id: dir.name,
