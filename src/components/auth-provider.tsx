@@ -29,10 +29,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, router]);
 
-  const logout = () => {
+  const logout = async () => {
+    // Clear sessionStorage
     sessionStorage.removeItem("auth");
+    
+    // Clear cookie via API
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+    
     setIsAuthenticated(false);
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   return (
