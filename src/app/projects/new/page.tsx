@@ -60,6 +60,12 @@ export default function NewProjectPage() {
             return;
           }
 
+          const data = await response.json();
+          // Update formData with the auto-assigned port
+          setFormData({
+            ...formData,
+            port: data.port.toString(),
+          });
           setStep(2);
         } catch (error) {
           console.error("Error initializing project:", error);
@@ -69,7 +75,7 @@ export default function NewProjectPage() {
         }
       }
     } else if (step === 2) {
-      if (formData.domain && formData.port) {
+      if (formData.domain) {
         setStep(3);
       }
     }
@@ -175,16 +181,11 @@ export default function NewProjectPage() {
                   <Input
                     id="port"
                     className="mt-1"
-                    type="number"
                     value={formData.port}
-                    onChange={(e) =>
-                      setFormData({ ...formData, port: e.target.value })
-                    }
-                    placeholder="5000"
-                    min="5000"
+                    readOnly
                   />
                   <p className="mt-1 text-xs text-gray-700">
-                    Choose a port for this project (e.g., 5000, 5001, 5002...)
+                    Port automatically assigned based on existing containers
                   </p>
                 </div>
                 <div className="flex items-center justify-between">
@@ -220,7 +221,7 @@ export default function NewProjectPage() {
               <Button variant="outline" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button onClick={handleContinue} disabled={!formData.domain || !formData.port}>
+              <Button onClick={handleContinue} disabled={!formData.domain}>
                 Continue
               </Button>
             </div>
