@@ -7,10 +7,10 @@ RUN apk add --no-cache libc6-compat git
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* ./
+COPY package.json ./
 
 # Install dependencies with npm (standard in Node.js images)
-RUN npm ci
+RUN npm install
 
 # Rebuild the source code only when needed
 FROM base AS builder
