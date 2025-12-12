@@ -27,6 +27,77 @@ export async function deployProject(projectName: string): Promise<void> {
   });
 }
 
+// Deploy with streaming logs
+export async function deployProjectWithLogs(
+  projectName: string,
+  onLog: (line: string) => void
+): Promise<void> {
+  const projectDir = join(config.projectsBaseDir, projectName);
+  const dockerComposeDir = join(projectDir, "docker");
+
+  const { spawn } = await import("child_process");
+
+  // Build with streaming
+  await new Promise<void>((resolve, reject) => {
+    onLog("🔨 Starting build...\n");
+    const buildProcess = spawn("docker", ["compose", "build"], {
+      cwd: dockerComposeDir,
+      shell: "/bin/sh",
+    });
+
+    buildProcess.stdout?.on("data", (data) => {
+      onLog(data.toString());
+    });
+
+    buildProcess.stderr?.on("data", (data) => {
+      onLog(data.toString());
+    });
+
+    buildProcess.on("close", (code) => {
+      if (code === 0) {
+        onLog("✅ Build completed successfully\n");
+        resolve();
+      } else {
+        reject(new Error(`Build failed with code ${code}`));
+      }
+    });
+
+    buildProcess.on("error", (error) => {
+      reject(error);
+    });
+  });
+
+  // Start with streaming
+  await new Promise<void>((resolve, reject) => {
+    onLog("🚀 Starting containers...\n");
+    const upProcess = spawn("docker", ["compose", "up", "-d"], {
+      cwd: dockerComposeDir,
+      shell: "/bin/sh",
+    });
+
+    upProcess.stdout?.on("data", (data) => {
+      onLog(data.toString());
+    });
+
+    upProcess.stderr?.on("data", (data) => {
+      onLog(data.toString());
+    });
+
+    upProcess.on("close", (code) => {
+      if (code === 0) {
+        onLog("✅ Deployment completed successfully\n");
+        resolve();
+      } else {
+        reject(new Error(`Deployment failed with code ${code}`));
+      }
+    });
+
+    upProcess.on("error", (error) => {
+      reject(error);
+    });
+  });
+}
+
 // Start database if it exists
 export async function startDatabase(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);

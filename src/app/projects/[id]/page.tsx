@@ -25,6 +25,8 @@ export default function ProjectDetailPage() {
   const [envVariables, setEnvVariables] = useState<EnvironmentVariable[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showDeployLogs, setShowDeployLogs] = useState(false);
+  const [deployLogs, setDeployLogs] = useState<string>("");
 
   useEffect(() => {
     fetchProject();
@@ -81,24 +83,68 @@ export default function ProjectDetailPage() {
   const handleDeploy = async () => {
     setActionLoading("deploy");
     setActionMessage(null);
+    setShowDeployLogs(true);
+    setDeployLogs("");
+    
     try {
       const auth = sessionStorage.getItem("auth");
-      const response = await fetch(`/api/projects/${projectId}/deploy`, {
-        method: "POST",
+      const response = await fetch(`/api/projects/${projectId}/deploy/stream`, {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
-      if (response.ok) {
-        const data = await response.json();
-        setActionMessage({ type: "success", text: data.message || "Project deployed successfully" });
-        await fetchProject();
-      } else {
-        const error = await response.json();
-        setActionMessage({ type: "error", text: error.error || "Failed to deploy project" });
+
+      if (!response.ok) {
+        throw new Error("Failed to start deployment");
       }
-    } catch (error) {
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.log) {
+                setDeployLogs((prev) => prev + data.log);
+                // Auto-scroll to bottom
+                setTimeout(() => {
+                  const logElement = document.getElementById("deploy-logs");
+                  if (logElement) {
+                    logElement.scrollTop = logElement.scrollHeight;
+                  }
+                }, 100);
+              }
+              if (data.log === "DONE") {
+                setActionLoading(null);
+                setActionMessage({ type: "success", text: "Project deployed successfully" });
+                await fetchProject();
+                // Close modal after 2 seconds
+                setTimeout(() => {
+                  setShowDeployLogs(false);
+                  setDeployLogs("");
+                }, 2000);
+                return;
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (error: any) {
       console.error("Error deploying:", error);
-      setActionMessage({ type: "error", text: "Failed to deploy project" });
-    } finally {
+      setDeployLogs((prev) => prev + `\n❌ Error: ${error.message}\n`);
+      setActionMessage({ type: "error", text: error.message || "Failed to deploy project" });
       setActionLoading(null);
     }
   };
