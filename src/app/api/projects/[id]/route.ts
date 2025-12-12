@@ -39,11 +39,16 @@ export async function GET(
         (d) => d.isDirectory() && d.name === "database"
       );
 
-      // Get domain from Nginx Proxy Manager
-      const { getDomainForProject } = await import("@/lib/services/nginx.service");
+      // Get domain from Nginx Proxy Manager (with timeout)
       let domain: string | null = null;
       try {
-        domain = await getDomainForProject(projectName, port);
+        const { getDomainForProject } = await import("@/lib/services/nginx.service");
+        // Add timeout to prevent hanging
+        const domainPromise = getDomainForProject(projectName, port);
+        const timeoutPromise = new Promise<null>((resolve) => 
+          setTimeout(() => resolve(null), 2000) // 2 second timeout
+        );
+        domain = await Promise.race([domainPromise, timeoutPromise]);
       } catch (error) {
         console.warn(`Failed to get domain from NPM for ${projectName}: ${error}`);
       }
