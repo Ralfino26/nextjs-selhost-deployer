@@ -15,15 +15,15 @@ async function getDocker() {
 // Networks (websites_network and infra_network) should already exist or be created by compose
 export async function deployProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
-  const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+  const dockerComposeDir = join(projectDir, "docker");
 
   // Run docker compose build and up -d (as per your workflow)
-  await execAsync(`docker compose -f ${dockerComposePath} build`, {
-    cwd: join(projectDir, "docker"),
+  await execAsync(`docker compose build`, {
+    cwd: dockerComposeDir,
   });
   
-  await execAsync(`docker compose -f ${dockerComposePath} up -d`, {
-    cwd: join(projectDir, "docker"),
+  await execAsync(`docker compose up -d`, {
+    cwd: dockerComposeDir,
   });
 }
 
@@ -114,15 +114,15 @@ export async function getLogs(
     // If container doesn't exist, try using docker compose logs
     try {
       const projectDir = join(config.projectsBaseDir, projectName);
-      const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+      const dockerComposeDir = join(projectDir, "docker");
       
       const { exec } = await import("child_process");
       const { promisify } = await import("util");
       const execAsync = promisify(exec);
       
       const result = await execAsync(
-        `docker compose -f ${dockerComposePath} logs --tail=${lines}`,
-        { cwd: join(projectDir, "docker") }
+        `docker compose logs --tail=${lines}`,
+        { cwd: dockerComposeDir }
       );
       
       return result.stdout || result.stderr || "No logs available";
