@@ -34,7 +34,6 @@ async function getNPMToken(): Promise<string> {
   }
 
   try {
-    console.log(`Attempting to connect to NPM at: ${npmUrl}`);
     const response = await fetch(`${npmUrl}/api/tokens`, {
       method: "POST",
       headers: {
@@ -44,8 +43,6 @@ async function getNPMToken(): Promise<string> {
         identity: npmEmail,
         secret: npmPassword,
       }),
-      // Add timeout
-      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
@@ -55,16 +52,9 @@ async function getNPMToken(): Promise<string> {
     const data: NPMTokenResponse = await response.json();
     npmToken = data.token;
     npmTokenExpiry = Date.now() + 3600000; // 1 hour
-    console.log("Successfully authenticated with NPM");
     return npmToken;
   } catch (error: any) {
-    const errorMsg = error?.message || error;
-    console.error(`NPM connection error: ${errorMsg}`);
-    // If it's a network error, provide helpful message
-    if (errorMsg.includes("fetch failed") || errorMsg.includes("ECONNREFUSED") || errorMsg.includes("timeout")) {
-      throw new Error(`Cannot connect to NPM at ${npmUrl}. Make sure NPM is running and the URL is correct. If NPM runs on the host, try: http://host.docker.internal:81 or http://<host-ip>:81`);
-    }
-    throw new Error(`Failed to get NPM token: ${errorMsg}`);
+    throw new Error(`Failed to get NPM token: ${error?.message || error}`);
   }
 }
 
@@ -85,7 +75,6 @@ async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
@@ -121,36 +110,45 @@ export async function getDomainForProject(
       console.log(`NPM Host: ${host.domain_names[0]} -> ${host.forward_scheme}://${host.forward_host}:${host.forward_port}`);
     });
     
-    // Try to match by forward_port and forward_host
-    // NPM typically forwards to localhost, 127.0.0.1, or container name
+    // Try to match by container name first (NPM often forwards to container name)
+    // NPM typically forwards to: http://container-name:3000 or http://localhost:port
     let matchingHost = hosts.find((host) => {
-      // Match by port first
-      if (host.forward_port === port) {
-        // Remove http:// or https:// prefix if present
-        let forwardHost = host.forward_host.toLowerCase().replace(/^https?:\/\//, '');
-        console.log(`Checking host: ${host.domain_names[0]} -> ${forwardHost}:${host.forward_port}`);
-        
-        // Check if forward_host matches localhost, 127.0.0.1, or container name
-        const matches = (
-          forwardHost === "localhost" ||
-          forwardHost === "127.0.0.1" ||
-          forwardHost === projectName.toLowerCase() ||
-          forwardHost.includes(projectName.toLowerCase())
-        );
-        
-        if (matches) {
-          console.log(`Matched! Domain: ${host.domain_names[0]}`);
-        }
-        
-        return matches;
+      // Remove http:// or https:// prefix if present
+      let forwardHost = host.forward_host.toLowerCase().replace(/^https?:\/\//, '');
+      console.log(`Checking host: ${host.domain_names[0]} -> ${forwardHost}:${host.forward_port}`);
+      
+      // Match by container name (most common case)
+      if (forwardHost === projectName.toLowerCase()) {
+        console.log(`Matched by container name! Domain: ${host.domain_names[0]}`);
+        return true;
       }
+      
+      // Match by port if forward_host is localhost or 127.0.0.1
+      if ((forwardHost === "localhost" || forwardHost === "127.0.0.1") && host.forward_port === port) {
+        console.log(`Matched by localhost + port! Domain: ${host.domain_names[0]}`);
+        return true;
+      }
+      
+      // Match if forward_host contains project name
+      if (forwardHost.includes(projectName.toLowerCase())) {
+        console.log(`Matched by partial container name! Domain: ${host.domain_names[0]}`);
+        return true;
+      }
+      
       return false;
     });
 
-    // Fallback: if no exact match, just match by port (in case forward_host is different)
+    // Fallback: if no exact match, try matching by port only (for localhost forwards)
     if (!matchingHost) {
       console.log(`No exact match found, trying port-only match for port ${port}`);
-      matchingHost = hosts.find((host) => host.forward_port === port);
+      matchingHost = hosts.find((host) => {
+        const forwardHost = host.forward_host.toLowerCase().replace(/^https?:\/\//, '');
+        // Only match by port if it's localhost/127.0.0.1
+        if ((forwardHost === "localhost" || forwardHost === "127.0.0.1") && host.forward_port === port) {
+          return true;
+        }
+        return false;
+      });
       if (matchingHost) {
         console.log(`Matched by port only! Domain: ${matchingHost.domain_names[0]}`);
       }
