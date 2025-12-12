@@ -301,6 +301,38 @@ export default function ProjectDetailPage() {
           {actionMessage.text}
         </div>
       )}
+
+      {/* Deploy Logs Modal */}
+      {showDeployLogs && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-4xl rounded-lg bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-gray-200 p-4">
+              <h2 className="text-lg font-semibold">Deployment Logs</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowDeployLogs(false);
+                  setDeployLogs("");
+                }}
+                disabled={actionLoading === "deploy"}
+              >
+                {actionLoading === "deploy" ? "Deploying..." : "Close"}
+              </Button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto p-4">
+              <pre
+                id="deploy-logs"
+                className="rounded bg-gray-900 p-4 text-xs text-green-400 font-mono whitespace-pre-wrap"
+                style={{ maxHeight: "60vh", overflow: "auto" }}
+              >
+                {deployLogs || "Starting deployment...\n"}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6 flex gap-2">
         <Button
           onClick={handleDeploy}
