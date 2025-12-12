@@ -33,12 +33,11 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
-        // Store credentials in sessionStorage (simple approach)
+        // Store credentials in sessionStorage for API calls
         sessionStorage.setItem("auth", credentials);
         
-        // Redirect to home
-        router.push("/");
-        router.refresh();
+        // Cookie is set by server, just redirect
+        window.location.href = "/";
       } else {
         setError("Invalid username or password");
       }

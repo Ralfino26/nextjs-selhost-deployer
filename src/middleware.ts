@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isAuthenticated } from "./lib/auth";
+import { isAuthenticated, checkAuth } from "./lib/auth";
 
 export const runtime = "nodejs"; // Use Node.js runtime instead of Edge
 
@@ -14,7 +14,26 @@ export function middleware(request: NextRequest) {
   }
 
   // Protect all other routes (including API)
-  if (!isAuthenticated(request)) {
+  // Check cookie for authentication
+  const authCookie = request.cookies.get("auth");
+  let authenticated = false;
+  
+  if (authCookie) {
+    try {
+      const credentials = Buffer.from(authCookie.value, "base64").toString("utf-8");
+      const [username, password] = credentials.split(":");
+      authenticated = checkAuth(username, password);
+    } catch (error) {
+      authenticated = false;
+    }
+  }
+  
+  // Also check Authorization header for API calls
+  if (!authenticated) {
+    authenticated = isAuthenticated(request);
+  }
+  
+  if (!authenticated) {
     // For API routes, return 401
     if (request.nextUrl.pathname.startsWith("/api")) {
       return NextResponse.json(

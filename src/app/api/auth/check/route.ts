@@ -15,7 +15,19 @@ export async function POST(request: NextRequest) {
 
     // Check credentials
     if (checkAuth(username, password)) {
-      return NextResponse.json({ success: true });
+      // Create response with success
+      const response = NextResponse.json({ success: true });
+      
+      // Set HTTP-only cookie for authentication
+      const credentials = Buffer.from(`${username}:${password}`).toString("base64");
+      response.cookies.set("auth", credentials, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
+      
+      return response;
     } else {
       return NextResponse.json(
         { error: "Invalid credentials" },
