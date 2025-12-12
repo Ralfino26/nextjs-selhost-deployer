@@ -40,33 +40,56 @@ export async function POST(
       // Fall back to git pull if gh CLI not available
       console.warn("GitHub CLI not available, falling back to git pull");
       
-      // For git pull, we need to configure the remote URL with token if available
+      // For git pull with private repos, we need to use the token in the URL
       if (config.githubToken) {
         try {
           // Get current remote URL
-          const remoteResult = await execAsync("git config --get remote.origin.url", { cwd: repoPath });
+          const remoteResult = await execAsync("git config --get remote.origin.url", { 
+            cwd: repoPath,
+            shell: "/bin/sh"
+          });
           const remoteUrl = remoteResult.stdout.trim();
           
-          // If it's a GitHub URL, update it with token
+          // If it's a GitHub URL, extract repo path and pull with token
           if (remoteUrl.includes("github.com")) {
             // Extract repo path from URL (handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git)
-            let repoPath = remoteUrl;
-            if (repoPath.startsWith("git@")) {
-              repoPath = repoPath.replace("git@github.com:", "https://github.com/").replace(".git", "");
+            let repoPathFromUrl = remoteUrl;
+            if (repoPathFromUrl.startsWith("git@")) {
+              repoPathFromUrl = repoPathFromUrl.replace("git@github.com:", "").replace(".git", "");
             } else {
-              repoPath = repoPath.replace("https://github.com/", "").replace(".git", "");
+              repoPathFromUrl = repoPathFromUrl.replace("https://github.com/", "").replace(".git", "");
+              // Remove token if already present
+              repoPathFromUrl = repoPathFromUrl.replace(/^[^@]+@/, "");
             }
             
-            // Update remote URL with token
-            const newUrl = `https://${config.githubToken}@github.com/${repoPath}.git`;
-            await execAsync(`git remote set-url origin ${newUrl}`, { cwd: repoPath });
+            // Pull using URL with token
+            const pullUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
+            await execAsync(`git pull ${pullUrl}`, { 
+              cwd: repoPath,
+              shell: "/bin/sh"
+            });
+          } else {
+            // Not a GitHub URL, just pull normally
+            await execAsync("git pull", { 
+              cwd: repoPath,
+              shell: "/bin/sh"
+            });
           }
-        } catch (configError) {
-          console.warn("Failed to configure git remote with token:", configError);
+        } catch (pullError) {
+          // If pull with URL fails, try normal pull
+          console.warn("Failed to pull with token URL, trying normal pull:", pullError);
+          await execAsync("git pull", { 
+            cwd: repoPath,
+            shell: "/bin/sh"
+          });
         }
+      } else {
+        // No token, just pull normally
+        await execAsync("git pull", { 
+          cwd: repoPath,
+          shell: "/bin/sh"
+        });
       }
-      
-      await execAsync("git pull", { cwd: repoPath });
     }
 
     // Rebuild and redeploy

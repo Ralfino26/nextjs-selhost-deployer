@@ -40,8 +40,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Install Docker CLI for dockerode
-RUN apk add --no-cache docker-cli git
+# Install Docker CLI for dockerode and bash for exec
+RUN apk add --no-cache docker-cli git bash
 
 # Keep root user to access Docker socket (required for dockerode)
 # The container needs root privileges to manage Docker containers
