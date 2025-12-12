@@ -33,6 +33,16 @@ export async function GET() {
       const projectDirs = await readdir(baseDir, { withFileTypes: true });
       console.log("Found directories:", projectDirs.map(d => d.name));
 
+      // First, collect all project data (without domain lookup)
+      const projectData: Array<{
+        name: string;
+        repo: string;
+        port: number;
+        hasDatabase: boolean;
+        status: "Running" | "Stopped" | "Error";
+        directory: string;
+      }> = [];
+
       for (const dir of projectDirs) {
         if (!dir.isDirectory()) continue;
 
@@ -61,40 +71,55 @@ export async function GET() {
             continue;
           }
 
-          // Get domain from Nginx Proxy Manager (with timeout)
-          let domain: string | null = null;
-          try {
-            const { getDomainForProject } = await import("@/lib/services/nginx.service");
-            // Add timeout to prevent hanging
-            const domainPromise = getDomainForProject(dir.name, port);
-            const timeoutPromise = new Promise<null>((resolve) => 
-              setTimeout(() => resolve(null), 2000) // 2 second timeout
-            );
-            domain = await Promise.race([domainPromise, timeoutPromise]);
-          } catch (error) {
-            console.warn(`Failed to get domain from NPM for ${dir.name}: ${error}`);
-          }
-
-          // Get status regardless of domain
+          // Get status
           const hasDatabase = projectSubDirs.some(
             (d) => d.isDirectory() && d.name === "database"
           );
           
           const status = await getProjectStatus(dir.name);
 
-          projects.push({
-            id: dir.name,
+          projectData.push({
             name: dir.name,
             repo: repoDir.name,
             port,
-            domain: domain || "ERROR: Domain not found in Nginx Proxy Manager",
-            createDatabase: hasDatabase,
+            hasDatabase,
             status,
             directory: join(baseDir, dir.name),
           });
         } catch {
           // Skip projects without docker-compose.yml
         }
+      }
+
+      // Now fetch domains in parallel (with timeout)
+      const { getDomainForProject } = await import("@/lib/services/nginx.service");
+      const domainPromises = projectData.map(async (data) => {
+        try {
+          const domainPromise = getDomainForProject(data.name, data.port);
+          const timeoutPromise = new Promise<null>((resolve) => 
+            setTimeout(() => resolve(null), 3000) // 3 second timeout per project
+          );
+          return await Promise.race([domainPromise, timeoutPromise]);
+        } catch (error) {
+          console.warn(`Failed to get domain from NPM for ${data.name}: ${error}`);
+          return null;
+        }
+      });
+
+      const domains = await Promise.all(domainPromises);
+
+      // Combine project data with domains
+      for (let i = 0; i < projectData.length; i++) {
+        projects.push({
+          id: projectData[i].name,
+          name: projectData[i].name,
+          repo: projectData[i].repo,
+          port: projectData[i].port,
+          domain: domains[i] || "ERROR: Domain not found in Nginx Proxy Manager",
+          createDatabase: projectData[i].hasDatabase,
+          status: projectData[i].status,
+          directory: projectData[i].directory,
+        });
       }
     } catch (error: any) {
       // Base directory doesn't exist, return empty array
