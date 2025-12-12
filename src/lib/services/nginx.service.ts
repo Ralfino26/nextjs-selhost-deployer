@@ -100,9 +100,19 @@ export async function getDomainForProject(
     console.log(`Looking for domain for project ${projectName} on port ${port}`);
     console.log(`Found ${hosts.length} proxy hosts in NPM`);
     
+    if (hosts.length === 0) {
+      console.log("No proxy hosts found in NPM");
+      return null;
+    }
+    
+    // Log all hosts for debugging
+    hosts.forEach((host) => {
+      console.log(`NPM Host: ${host.domain_names[0]} -> ${host.forward_scheme}://${host.forward_host}:${host.forward_port}`);
+    });
+    
     // Try to match by forward_port and forward_host
     // NPM typically forwards to localhost, 127.0.0.1, or container name
-    const matchingHost = hosts.find((host) => {
+    let matchingHost = hosts.find((host) => {
       // Match by port first
       if (host.forward_port === port) {
         // Remove http:// or https:// prefix if present
@@ -125,6 +135,15 @@ export async function getDomainForProject(
       }
       return false;
     });
+
+    // Fallback: if no exact match, just match by port (in case forward_host is different)
+    if (!matchingHost) {
+      console.log(`No exact match found, trying port-only match for port ${port}`);
+      matchingHost = hosts.find((host) => host.forward_port === port);
+      if (matchingHost) {
+        console.log(`Matched by port only! Domain: ${matchingHost.domain_names[0]}`);
+      }
+    }
 
     if (matchingHost && matchingHost.domain_names.length > 0) {
       // Return the first domain name
