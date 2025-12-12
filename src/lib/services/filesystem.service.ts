@@ -31,15 +31,26 @@ export async function cloneRepository(
   const repoName = repo.split("/").pop() || "repo";
   const repoDir = join(targetDir, repoName);
   
+  const githubToken = config.githubToken;
+  
   // Use GitHub CLI to clone: gh repo clone owner/repo
   try {
+    // Set GITHUB_TOKEN if available
+    const env = githubToken ? { ...process.env, GITHUB_TOKEN: githubToken } : process.env;
     await execAsync(`gh repo clone ${repo} ${repoDir}`, {
       cwd: targetDir,
+      env,
     });
   } catch (error) {
     // If gh CLI fails, fall back to git clone
     console.warn("GitHub CLI not available, falling back to git clone");
-    const repoUrl = `https://github.com/${repo}.git`;
+    let repoUrl = `https://github.com/${repo}.git`;
+    
+    // Use token in URL if available (for private repos)
+    if (githubToken) {
+      repoUrl = `https://${githubToken}@github.com/${repo}.git`;
+    }
+    
     await execAsync(`git clone ${repoUrl} ${repoDir}`, {
       cwd: targetDir,
     });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { z } from "zod";
+import { clearConfigCache } from "@/lib/config";
 
 const configSchema = z.object({
   githubToken: z.string(),
@@ -24,16 +25,16 @@ export async function GET() {
       const config = JSON.parse(content);
       return NextResponse.json(config);
     } catch {
-      // Config file doesn't exist, return defaults from env
+      // Config file doesn't exist, return defaults
       return NextResponse.json({
-        githubToken: process.env.GITHUB_TOKEN || "",
-        mongoUser: process.env.MONGO_USER || "ralf",
-        mongoPassword: process.env.MONGO_PASSWORD || "supersecret",
-        mongoDefaultDatabase: process.env.MONGO_DEFAULT_DATABASE || "admin",
-        projectsBaseDir: process.env.PROJECTS_BASE_DIR || "/srv/vps/websites",
-        startingPort: parseInt(process.env.STARTING_PORT || "5000", 10),
-        websitesNetwork: process.env.WEBSITES_NETWORK || "websites_network",
-        infraNetwork: process.env.INFRA_NETWORK || "infra_network",
+        githubToken: "",
+        mongoUser: "ralf",
+        mongoPassword: "supersecret",
+        mongoDefaultDatabase: "admin",
+        projectsBaseDir: "/srv/vps/websites",
+        startingPort: 5000,
+        websitesNetwork: "websites_network",
+        infraNetwork: "infra_network",
       });
     }
   } catch (error) {
@@ -58,8 +59,8 @@ export async function POST(request: NextRequest) {
     // Save to file
     await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
 
-    // Note: These settings are stored in config.json but environment variables
-    // take precedence. To apply changes, users need to update .env and restart.
+    // Clear config cache so new values are loaded
+    clearConfigCache();
 
     return NextResponse.json({ success: true });
   } catch (error) {

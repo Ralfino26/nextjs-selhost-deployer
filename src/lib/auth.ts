@@ -1,13 +1,12 @@
+import { webAuth } from "./config";
+
 // Simple authentication check
 export function checkAuth(username: string, password: string): boolean {
-  const validUsername = process.env.WEB_USERNAME || "ralf";
-  const validPassword = process.env.WEB_PASSWORD || "supersecret";
-  
   if (!username || !password) {
     return false;
   }
   
-  return username === validUsername && password === validPassword;
+  return username === webAuth.username && password === webAuth.password;
 }
 
 export function isAuthenticated(request: Request): boolean {

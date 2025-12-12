@@ -9,27 +9,14 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      # Base directory where projects will be stored
-      - PROJECTS_BASE_DIR=${PROJECTS_BASE_DIR:-/srv/vps/websites}
-      # Starting port for new projects
-      - STARTING_PORT=${STARTING_PORT:-5000}
-      # Docker network names
-      - WEBSITES_NETWORK=${WEBSITES_NETWORK:-websites_network}
-      - INFRA_NETWORK=${INFRA_NETWORK:-infra_network}
-      # Web interface authentication
+      # Web interface authentication (ONLY these in env)
       - WEB_USERNAME=${WEB_USERNAME:-ralf}
       - WEB_PASSWORD=${WEB_PASSWORD:-supersecret}
-      # GitHub API token (optional, for private repos)
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      # MongoDB credentials
-      - MONGO_USER=${MONGO_USER:-ralf}
-      - MONGO_PASSWORD=${MONGO_PASSWORD:-supersecret}
-      - MONGO_DEFAULT_DATABASE=${MONGO_DEFAULT_DATABASE:-admin}
     volumes:
       # Mount Docker socket to allow container management
       - /var/run/docker.sock:/var/run/docker.sock
-      # Mount projects directory (use absolute path from .env)
-      - ${PROJECTS_BASE_DIR:-./projects}:/srv/vps/websites
+      # Mount projects directory (configured via web interface, default: /srv/vps/websites)
+      - ./projects:/srv/vps/websites
       # Mount data directory for port registry (optional)
       - ./data:/app/data
     networks:

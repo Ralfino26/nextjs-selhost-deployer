@@ -1,23 +1,98 @@
-// Configuration for deployment manager
+import { readFileSync } from "fs";
+import { join } from "path";
+import { existsSync } from "fs";
+
+const CONFIG_FILE = join(process.cwd(), "data", "config.json");
+
+interface ConfigData {
+  githubToken: string;
+  mongoUser: string;
+  mongoPassword: string;
+  mongoDefaultDatabase: string;
+  projectsBaseDir: string;
+  startingPort: number;
+  websitesNetwork: string;
+  infraNetwork: string;
+}
+
+let cachedConfig: ConfigData | null = null;
+
+function loadConfig(): ConfigData {
+  // Return cached config if available
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  // Try to load from config.json
+  if (existsSync(CONFIG_FILE)) {
+    try {
+      const content = readFileSync(CONFIG_FILE, "utf-8");
+      cachedConfig = JSON.parse(content);
+      return cachedConfig!;
+    } catch (error) {
+      console.error("Error reading config.json:", error);
+    }
+  }
+
+  // Return defaults if config.json doesn't exist
+  const defaults: ConfigData = {
+    githubToken: "",
+    mongoUser: "ralf",
+    mongoPassword: "supersecret",
+    mongoDefaultDatabase: "admin",
+    projectsBaseDir: "/srv/vps/websites",
+    startingPort: 5000,
+    websitesNetwork: "websites_network",
+    infraNetwork: "infra_network",
+  };
+  
+  cachedConfig = defaults;
+  return defaults;
+}
+
+// Clear cache (call this after saving settings)
+export function clearConfigCache() {
+  cachedConfig = null;
+}
+
+// Configuration object - reads from config.json first, then defaults
 export const config = {
-  // Base directory where all projects are stored
-  projectsBaseDir: process.env.PROJECTS_BASE_DIR || "/srv/vps/websites",
+  get projectsBaseDir(): string {
+    return loadConfig().projectsBaseDir;
+  },
   
-  // Starting port for projects (will auto-increment from 5000)
-  startingPort: parseInt(process.env.STARTING_PORT || "5000", 10),
+  get startingPort(): number {
+    return loadConfig().startingPort;
+  },
   
-  // Docker network names
-  websitesNetwork: process.env.WEBSITES_NETWORK || "websites_network",
-  infraNetwork: process.env.INFRA_NETWORK || "infra_network",
+  get websitesNetwork(): string {
+    return loadConfig().websitesNetwork;
+  },
   
-  // GitHub API token (optional, for private repos)
-  githubToken: process.env.GITHUB_TOKEN || "",
+  get infraNetwork(): string {
+    return loadConfig().infraNetwork;
+  },
   
-  // MongoDB default credentials
-  database: {
-    user: process.env.MONGO_USER || "ralf",
-    password: process.env.MONGO_PASSWORD || "supersecret",
-    defaultDatabase: process.env.MONGO_DEFAULT_DATABASE || "admin",
+  get githubToken(): string {
+    return loadConfig().githubToken;
+  },
+  
+  get database(): {
+    user: string;
+    password: string;
+    defaultDatabase: string;
+  } {
+    const c = loadConfig();
+    return {
+      user: c.mongoUser,
+      password: c.mongoPassword,
+      defaultDatabase: c.mongoDefaultDatabase,
+    };
   },
 };
 
+// Web interface credentials - ONLY from environment variables
+export const webAuth = {
+  username: process.env.WEB_USERNAME || "ralf",
+  password: process.env.WEB_PASSWORD || "supersecret",
+};

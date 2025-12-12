@@ -45,52 +45,35 @@ That's it! The deployment manager will be available at `http://localhost:3000` (
 
 ## Configuration
 
-Edit the `.env` file to configure the deployment manager:
+### Environment Variables (.env)
+
+Only the web interface port and authentication credentials are configured via `.env`:
 
 ```env
 # Port for the deployment manager web interface
 PORT=3000
 
-# Base directory where all projects will be stored
-# This path will be mounted as a volume
-PROJECTS_BASE_DIR=/srv/vps/websites
-
-# Starting port for new projects (auto-increments from here)
-STARTING_PORT=5000
-
-# Docker network names for deployed projects
-WEBSITES_NETWORK=websites_network
-INFRA_NETWORK=infra_network
-
-# GitHub API token (optional, required for private repositories)
-# Generate at: https://github.com/settings/tokens
-GITHUB_TOKEN=your_github_token_here
-
 # Web interface authentication
 WEB_USERNAME=ralf
 WEB_PASSWORD=supersecret
-
-# MongoDB credentials (for projects that use databases)
-MONGO_USER=ralf
-MONGO_PASSWORD=your_secure_password_here
-MONGO_DEFAULT_DATABASE=admin
 ```
 
-### Important Configuration Options
+**IMPORTANT**: Change `WEB_USERNAME` and `WEB_PASSWORD` to secure values in production!
 
-- **PROJECTS_BASE_DIR**: Change this to where you want projects stored on your VPS
-  - Default: `/srv/vps/websites`
-  - Example: `/home/user/projects` or `/var/www/projects`
-  
-- **GITHUB_TOKEN**: Required if you want to clone private repositories
-  - Generate at: https://github.com/settings/tokens
-  - Needs `repo` scope for private repos
+### Web Interface Settings
 
-- **MONGO_PASSWORD**: Change this to a secure password for MongoDB database projects
+All other configuration (GitHub token, MongoDB credentials, project directories, ports, networks) is managed through the **Settings** page in the web interface:
 
-- **WEB_USERNAME** / **WEB_PASSWORD**: Credentials for accessing the web interface
-  - Default: `ralf` / `supersecret`
-  - **IMPORTANT**: Change these to secure values in production!
+1. Log in to the dashboard
+2. Click **Settings** in the header
+3. Configure:
+   - **GitHub Token**: For cloning private repositories (generate at https://github.com/settings/tokens)
+   - **MongoDB Credentials**: For projects that use databases
+   - **Projects Base Directory**: Where projects are stored (default: `/srv/vps/websites`)
+   - **Starting Port**: First port for new projects (default: `5000`)
+   - **Docker Networks**: Network names for deployed projects
+
+Settings are saved to `data/config.json` and persist across container restarts (via volume mount).
 
 ## Accessing the Dashboard
 
