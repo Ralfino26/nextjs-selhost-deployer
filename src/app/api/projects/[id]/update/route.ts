@@ -60,13 +60,21 @@ export async function POST(
         if (remoteUrl.includes("github.com")) {
           // Extract repo path from URL (handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git)
           let repoPathFromUrl = remoteUrl;
+          
           if (repoPathFromUrl.startsWith("git@")) {
+            // git@github.com:owner/repo.git -> owner/repo
             repoPathFromUrl = repoPathFromUrl.replace("git@github.com:", "").replace(".git", "");
+          } else if (repoPathFromUrl.startsWith("https://")) {
+            // https://github.com/owner/repo.git -> owner/repo
+            // Or https://token@github.com/owner/repo.git -> owner/repo
+            repoPathFromUrl = repoPathFromUrl.replace(/^https:\/\/([^@]+@)?github\.com\//, "").replace(".git", "");
           } else {
-            repoPathFromUrl = repoPathFromUrl.replace("https://github.com/", "").replace(".git", "");
-            // Remove token if already present
-            repoPathFromUrl = repoPathFromUrl.replace(/^[^@]+@/, "");
+            // Already just owner/repo format
+            repoPathFromUrl = repoPathFromUrl.replace(".git", "");
           }
+          
+          // Ensure we have a clean owner/repo format
+          repoPathFromUrl = repoPathFromUrl.trim();
           
           // Update remote URL with token
           const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
