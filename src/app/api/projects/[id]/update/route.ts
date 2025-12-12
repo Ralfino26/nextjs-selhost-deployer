@@ -34,10 +34,38 @@ export async function POST(
 
     // Use gh repo sync as per your workflow
     try {
-      await execAsync("gh repo sync", { cwd: repoPath });
+      const env = config.githubToken ? { ...process.env, GITHUB_TOKEN: config.githubToken } : process.env;
+      await execAsync("gh repo sync", { cwd: repoPath, env });
     } catch (error) {
       // Fall back to git pull if gh CLI not available
       console.warn("GitHub CLI not available, falling back to git pull");
+      
+      // For git pull, we need to configure the remote URL with token if available
+      if (config.githubToken) {
+        try {
+          // Get current remote URL
+          const remoteResult = await execAsync("git config --get remote.origin.url", { cwd: repoPath });
+          const remoteUrl = remoteResult.stdout.trim();
+          
+          // If it's a GitHub URL, update it with token
+          if (remoteUrl.includes("github.com")) {
+            // Extract repo path from URL (handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git)
+            let repoPath = remoteUrl;
+            if (repoPath.startsWith("git@")) {
+              repoPath = repoPath.replace("git@github.com:", "https://github.com/").replace(".git", "");
+            } else {
+              repoPath = repoPath.replace("https://github.com/", "").replace(".git", "");
+            }
+            
+            // Update remote URL with token
+            const newUrl = `https://${config.githubToken}@github.com/${repoPath}.git`;
+            await execAsync(`git remote set-url origin ${newUrl}`, { cwd: repoPath });
+          }
+        } catch (configError) {
+          console.warn("Failed to configure git remote with token:", configError);
+        }
+      }
+      
       await execAsync("git pull", { cwd: repoPath });
     }
 
