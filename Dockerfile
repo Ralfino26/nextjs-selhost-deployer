@@ -32,7 +32,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN if [ -f bun.lock ]; then \
       apk add --no-cache curl unzip bash && \
       curl -fsSL https://bun.sh/install | bash && \
-      /root/.bun/bin/bun run build; \
+      /root/.bun/bin/bun run --bun next build; \
     else \
       npm run build; \
     fi
