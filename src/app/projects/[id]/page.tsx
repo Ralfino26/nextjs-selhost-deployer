@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -25,8 +23,6 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState("");
   const [envVariables, setEnvVariables] = useState<EnvironmentVariable[]>([]);
-  const [newKey, setNewKey] = useState("");
-  const [newValue, setNewValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -157,33 +153,6 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleAddEnvVar = () => {
-    if (newKey && newValue) {
-      setEnvVariables([...envVariables, { key: newKey, value: newValue }]);
-      setNewKey("");
-      setNewValue("");
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      const auth = sessionStorage.getItem("auth");
-      const response = await fetch(`/api/projects/${projectId}/env`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(auth ? { Authorization: `Basic ${auth}` } : {}),
-        },
-        body: JSON.stringify({ variables: envVariables }),
-      });
-      if (response.ok) {
-        alert("Environment variables saved");
-      }
-    } catch (error) {
-      console.error("Error saving env vars:", error);
-      alert("Failed to save environment variables");
-    }
-  };
 
   if (loading) {
     return (
@@ -306,20 +275,19 @@ export default function ProjectDetailPage() {
                 Refresh
               </Button>
             </div>
-            <div className="mb-4">
+            <div>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Key</TableHead>
                     <TableHead>Value</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {envVariables.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center text-gray-700">
-                        No environment variables set
+                      <TableCell colSpan={2} className="text-center text-gray-700">
+                        No environment variables found
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -327,52 +295,11 @@ export default function ProjectDetailPage() {
                       <TableRow key={index}>
                         <TableCell className="font-medium">{env.key}</TableCell>
                         <TableCell className="font-mono text-sm">{env.value}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEnvVariables(envVariables.filter((_, i) => i !== index));
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
-            </div>
-            <div className="mb-4 space-y-3 border-t border-gray-200 pt-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="env-key">Key</Label>
-                  <Input
-                    id="env-key"
-                    className="mt-1"
-                    value={newKey}
-                    onChange={(e) => setNewKey(e.target.value)}
-                    placeholder="ENV_VAR_NAME"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="env-value">Value</Label>
-                  <Input
-                    id="env-value"
-                    className="mt-1"
-                    value={newValue}
-                    onChange={(e) => setNewValue(e.target.value)}
-                    placeholder="value"
-                  />
-                </div>
-              </div>
-              <Button variant="outline" onClick={handleAddEnvVar}>
-                Add Variable
-              </Button>
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleSave}>Save</Button>
             </div>
           </div>
         </TabsContent>
