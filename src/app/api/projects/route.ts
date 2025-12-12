@@ -61,9 +61,7 @@ export async function GET() {
             continue;
           }
 
-          const status = await getProjectStatus(dir.name);
-          
-          // Read domain from metadata.json (required)
+          // Read domain from metadata.json first
           const metadataPath = join(baseDir, dir.name, "metadata.json");
           let domain: string | null = null;
           try {
@@ -77,9 +75,15 @@ export async function GET() {
             console.warn(`No metadata.json for project ${dir.name}: ${error}`);
           }
 
+          // Get status - only if domain exists, otherwise mark as Error
           const hasDatabase = projectSubDirs.some(
             (d) => d.isDirectory() && d.name === "database"
           );
+          
+          let status: "Running" | "Stopped" | "Error" = "Error";
+          if (domain) {
+            status = await getProjectStatus(dir.name);
+          }
 
           projects.push({
             id: dir.name,
@@ -88,7 +92,7 @@ export async function GET() {
             port,
             domain: domain || "ERROR: metadata.json missing",
             createDatabase: hasDatabase,
-            status: domain ? status : "Error",
+            status,
             directory: join(baseDir, dir.name),
           });
         } catch {

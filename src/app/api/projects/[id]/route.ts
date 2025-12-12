@@ -35,29 +35,28 @@ export async function GET(
         );
       }
 
-      const status = await getProjectStatus(projectName);
       const hasDatabase = projectSubDirs.some(
         (d) => d.isDirectory() && d.name === "database"
       );
 
-      // Read domain from metadata.json (required)
+      // Read domain from metadata.json first
       const metadataPath = join(projectDir, "metadata.json");
-      let domain: string;
+      let domain: string | null = null;
       try {
         const metadataContent = await readFile(metadataPath, "utf-8");
         const metadata = JSON.parse(metadataContent);
-        if (!metadata.domain) {
-          return NextResponse.json(
-            { error: "Domain not found in metadata.json" },
-            { status: 404 }
-          );
+        if (metadata.domain) {
+          domain = metadata.domain;
         }
-        domain = metadata.domain;
-      } catch (error: any) {
-        return NextResponse.json(
-          { error: `Failed to read metadata.json: ${error?.message || "File not found"}` },
-          { status: 404 }
-        );
+      } catch (error) {
+        // metadata.json doesn't exist or is invalid - will show error in UI
+        console.warn(`No metadata.json for project ${projectName}: ${error}`);
+      }
+
+      // Get status - only if domain exists, otherwise mark as Error
+      let status: "Running" | "Stopped" | "Error" = "Error";
+      if (domain) {
+        status = await getProjectStatus(projectName);
       }
 
       const project: Project = {
@@ -65,7 +64,7 @@ export async function GET(
         name: projectName,
         repo: repoDir.name,
         port,
-        domain,
+        domain: domain || "ERROR: metadata.json missing",
         createDatabase: hasDatabase,
         status,
         directory: projectDir,
