@@ -137,7 +137,82 @@ export async function POST(
       );
     }
 
-    // Update docker-compose.yml with new environment variables
+    const repoPath = join(projectDir, repoDir.name);
+    
+    // Update .env.local file in the repo (or .env if .env.local doesn't exist)
+    const envLocalPath = join(repoPath, ".env.local");
+    const envPath = join(repoPath, ".env");
+    
+    // Read existing .env.local or .env file
+    let envContent = "";
+    let targetEnvFile = envLocalPath;
+    try {
+      envContent = await readFile(envLocalPath, "utf-8");
+    } catch {
+      try {
+        envContent = await readFile(envPath, "utf-8");
+        targetEnvFile = envPath;
+      } catch {
+        // File doesn't exist, will create new one
+        envContent = "";
+      }
+    }
+    
+    // Parse existing env vars from file
+    const existingEnvVars = new Map<string, string>();
+    const envLines = envContent.split("\n");
+    const newEnvLines: string[] = [];
+    
+    // Keep comments and empty lines, update existing vars
+    for (const line of envLines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || trimmedLine.startsWith("#")) {
+        newEnvLines.push(line);
+        continue;
+      }
+      
+      const match = trimmedLine.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        existingEnvVars.set(key, match[2].trim().replace(/^["']|["']$/g, ""));
+      }
+    }
+    
+    // Update with new variables
+    for (const variable of data.variables) {
+      existingEnvVars.set(variable.key, variable.value);
+    }
+    
+    // Write updated .env file
+    let newEnvContent = "";
+    // Keep existing comments and empty lines
+    for (const line of envLines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || trimmedLine.startsWith("#")) {
+        newEnvContent += line + "\n";
+        continue;
+      }
+      
+      const match = trimmedLine.match(/^([^=]+)=/);
+      if (match) {
+        const key = match[1].trim();
+        if (existingEnvVars.has(key)) {
+          const value = existingEnvVars.get(key)!;
+          newEnvContent += `${key}=${value}\n`;
+          existingEnvVars.delete(key); // Mark as written
+        }
+      }
+    }
+    
+    // Add any new variables that weren't in the file
+    for (const [key, value] of existingEnvVars.entries()) {
+      newEnvContent += `${key}=${value}\n`;
+    }
+    
+    // Write to .env.local (preferred) or .env
+    await writeFile(targetEnvFile, newEnvContent.trim() + "\n", "utf-8");
+    
+    // Also update docker-compose.yml with new environment variables
     const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
     
     // Read existing docker-compose.yml
