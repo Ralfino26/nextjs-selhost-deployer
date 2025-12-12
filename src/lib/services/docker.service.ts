@@ -11,31 +11,19 @@ async function getDocker() {
   return new Docker();
 }
 
-// Ensure Docker network exists
-export async function ensureNetwork(): Promise<void> {
-  const docker = await getDocker();
-  try {
-    await docker.getNetwork(config.dockerNetwork).inspect();
-  } catch {
-    // Network doesn't exist, create it
-    await docker.createNetwork({
-      Name: config.dockerNetwork,
-      Driver: "bridge",
-    });
-  }
-}
-
 // Build and start a project using docker-compose
+// Networks (websites_network and infra_network) should already exist or be created by compose
 export async function deployProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
-  // Ensure network exists
-  await ensureNetwork();
-
-  // Run docker-compose up -d --build
-  await execAsync(`docker-compose -f ${dockerComposePath} up -d --build`, {
-    cwd: projectDir,
+  // Run docker compose build and up -d (as per your workflow)
+  await execAsync(`docker compose -f ${dockerComposePath} build`, {
+    cwd: join(projectDir, "docker"),
+  });
+  
+  await execAsync(`docker compose -f ${dockerComposePath} up -d`, {
+    cwd: join(projectDir, "docker"),
   });
 }
 
@@ -45,8 +33,8 @@ export async function startDatabase(projectName: string): Promise<void> {
   const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
 
   try {
-    await execAsync(`docker-compose -f ${databaseComposePath} up -d`, {
-      cwd: projectDir,
+    await execAsync(`docker compose -f ${databaseComposePath} up -d`, {
+      cwd: join(projectDir, "database"),
     });
   } catch (error) {
     // Database compose file might not exist
@@ -59,8 +47,8 @@ export async function restartProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
-  await execAsync(`docker-compose -f ${dockerComposePath} restart`, {
-    cwd: projectDir,
+  await execAsync(`docker compose -f ${dockerComposePath} restart`, {
+    cwd: join(projectDir, "docker"),
   });
 }
 
@@ -69,8 +57,8 @@ export async function stopProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
-  await execAsync(`docker-compose -f ${dockerComposePath} stop`, {
-    cwd: projectDir,
+  await execAsync(`docker compose -f ${dockerComposePath} stop`, {
+    cwd: join(projectDir, "docker"),
   });
 }
 
@@ -82,8 +70,8 @@ export async function deleteProject(projectName: string): Promise<void> {
 
   // Stop and remove main service
   try {
-    await execAsync(`docker-compose -f ${dockerComposePath} down -v`, {
-      cwd: projectDir,
+    await execAsync(`docker compose -f ${dockerComposePath} down -v`, {
+      cwd: join(projectDir, "docker"),
     });
   } catch (error) {
     console.error(`Failed to remove main service:`, error);
@@ -91,8 +79,8 @@ export async function deleteProject(projectName: string): Promise<void> {
 
   // Stop and remove database if exists
   try {
-    await execAsync(`docker-compose -f ${databaseComposePath} down -v`, {
-      cwd: projectDir,
+    await execAsync(`docker compose -f ${databaseComposePath} down -v`, {
+      cwd: join(projectDir, "database"),
     });
   } catch (error) {
     // Database might not exist, ignore

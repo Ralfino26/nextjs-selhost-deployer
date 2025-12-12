@@ -14,15 +14,16 @@ services:
       # Base directory where projects will be stored
       - PROJECTS_BASE_DIR=${PROJECTS_BASE_DIR:-/srv/vps/websites}
       # Starting port for new projects
-      - STARTING_PORT=${STARTING_PORT:-3000}
-      # Docker network name
-      - DOCKER_NETWORK=${DOCKER_NETWORK:-deployment-network}
+      - STARTING_PORT=${STARTING_PORT:-5000}
+      # Docker network names
+      - WEBSITES_NETWORK=${WEBSITES_NETWORK:-websites_network}
+      - INFRA_NETWORK=${INFRA_NETWORK:-infra_network}
       # GitHub API token (optional, for private repos)
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      # Database credentials
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_DEFAULT_DATABASE=${DB_DEFAULT_DATABASE:-postgres}
+      # MongoDB credentials
+      - MONGO_USER=${MONGO_USER:-ralf}
+      - MONGO_PASSWORD=${MONGO_PASSWORD:-supersecret}
+      - MONGO_DEFAULT_DATABASE=${MONGO_DEFAULT_DATABASE:-admin}
     volumes:
       # Mount Docker socket to allow container management
       - /var/run/docker.sock:/var/run/docker.sock

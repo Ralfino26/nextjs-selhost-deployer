@@ -101,7 +101,8 @@ export async function POST(request: NextRequest) {
     // Write database compose if needed (this is the only thing that might not exist yet)
     if (data.createDatabase) {
       const { writeDatabaseCompose } = await import("@/lib/services/filesystem.service");
-      await writeDatabaseCompose(projectDir, data.projectName);
+      // Use project name as database name
+      await writeDatabaseCompose(projectDir, data.projectName, data.projectName);
       await startDatabase(data.projectName);
     }
 

@@ -23,12 +23,8 @@ export async function POST(request: NextRequest) {
     // Create project directory structure
     const projectDir = await createProjectDirectory(data.projectName);
 
-    // Clone repository
-    const repoUrl = `https://github.com/${data.repo}.git`;
-    await cloneRepository(repoUrl, projectDir);
-
-    // Extract repo name from repo string (e.g., "ralf/my-app" -> "my-app")
-    const repoName = data.repo.split("/").pop() || "repo";
+    // Clone repository using gh repo clone (format: "Ralfino26/repo-name")
+    const repoName = await cloneRepository(data.repo, projectDir);
 
     // Write Dockerfile in the repo folder (only if it doesn't exist)
     await writeDockerfile(projectDir, repoName);

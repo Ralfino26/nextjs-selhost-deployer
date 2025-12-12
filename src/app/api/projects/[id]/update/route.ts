@@ -4,7 +4,6 @@ import { promisify } from "util";
 import { join } from "path";
 import { config } from "@/lib/config";
 import { deployProject } from "@/lib/services/docker.service";
-import simpleGit from "simple-git";
 
 const execAsync = promisify(exec);
 
@@ -32,10 +31,15 @@ export async function POST(
     }
 
     const repoPath = join(projectDir, repoDir.name);
-    const git = simpleGit(repoPath);
 
-    // Pull latest changes
-    await git.pull();
+    // Use gh repo sync as per your workflow
+    try {
+      await execAsync("gh repo sync", { cwd: repoPath });
+    } catch (error) {
+      // Fall back to git pull if gh CLI not available
+      console.warn("GitHub CLI not available, falling back to git pull");
+      await execAsync("git pull", { cwd: repoPath });
+    }
 
     // Rebuild and redeploy
     await deployProject(projectName);
