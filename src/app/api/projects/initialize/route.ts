@@ -7,7 +7,6 @@ import {
   writeDockerCompose,
   writeDatabaseCompose,
 } from "@/lib/services/filesystem.service";
-import { getNextAvailablePort } from "@/lib/services/port.service";
 
 const initializeSchema = z.object({
   repo: z.string().min(1),
@@ -29,20 +28,13 @@ export async function POST(request: NextRequest) {
     // Write Dockerfile in the repo folder (only if it doesn't exist)
     await writeDockerfile(projectDir, repoName);
 
-    // Get next available port
-    const port = await getNextAvailablePort();
-
-    // Write docker-compose.yml in docker folder
-    await writeDockerCompose(projectDir, data.projectName, repoName, port);
-
-    // Write database docker-compose.yml in database folder (will be created when database is enabled)
-    // We create the folder structure but don't write the file yet until user confirms database
+    // Don't create docker-compose.yml yet - user will choose port in step 2
+    // We create the folder structure but don't write the file yet until user confirms port
 
     return NextResponse.json({
       success: true,
       projectName: data.projectName,
       repoName,
-      port,
       message: "Project structure initialized",
     });
   } catch (error) {

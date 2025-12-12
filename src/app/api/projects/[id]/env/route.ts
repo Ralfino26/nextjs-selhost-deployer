@@ -38,24 +38,33 @@ export async function GET(
       );
     }
 
-    const envPath = join(projectDir, repoDir.name, ".env.local");
+    // Read environment variables from docker-compose.yml
+    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
     try {
-      const content = await readFile(envPath, "utf-8");
-      const variables: EnvironmentVariable[] = content
-        .split("\n")
-        .filter((line) => line.trim() && !line.startsWith("#"))
-        .map((line) => {
-          const [key, ...valueParts] = line.split("=");
-          return {
-            key: key.trim(),
-            value: valueParts.join("=").trim(),
-          };
-        });
+      const content = await readFile(dockerComposePath, "utf-8");
+      const variables: EnvironmentVariable[] = [];
+      
+      // Parse environment section from docker-compose.yml
+      const envMatch = content.match(/environment:\s*\n((?:\s+[^:\n]+:[^\n]+\n?)+)/);
+      if (envMatch) {
+        const envLines = envMatch[1].trim().split("\n");
+        for (const line of envLines) {
+          const match = line.trim().match(/^([^:]+):\s*(.+)$/);
+          if (match) {
+            const key = match[1].trim();
+            const value = match[2].trim();
+            // Skip NODE_ENV as it's always there
+            if (key !== "NODE_ENV") {
+              variables.push({ key, value });
+            }
+          }
+        }
+      }
 
       return NextResponse.json({ variables });
     } catch {
-      // .env.local doesn't exist, return empty
+      // docker-compose.yml doesn't exist or can't be read, return empty
       return NextResponse.json({ variables: [] });
     }
   } catch (error) {
@@ -94,14 +103,23 @@ export async function POST(
       );
     }
 
-    const envPath = join(projectDir, repoDir.name, ".env.local");
-
-    // Write environment variables
-    const content = data.variables
-      .map((v) => `${v.key}=${v.value}`)
-      .join("\n");
-
-    await writeFile(envPath, content, "utf-8");
+    // Update docker-compose.yml with new environment variables
+    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+    
+    // Read existing docker-compose.yml
+    const existingContent = await readFile(dockerComposePath, "utf-8");
+    
+    // Extract port from existing compose file
+    const portMatch = existingContent.match(/ports:\s*\n\s+-\s+"(\d+):3000"/);
+    const port = portMatch ? parseInt(portMatch[1], 10) : 5000;
+    
+    // Rebuild docker-compose.yml with new environment variables
+    const { writeDockerCompose } = await import("@/lib/services/filesystem.service");
+    await writeDockerCompose(projectDir, projectName, repoDir.name, port, data.variables);
+    
+    // Restart container to apply new environment variables
+    const { restartProject } = await import("@/lib/services/docker.service");
+    await restartProject(projectName);
 
     return NextResponse.json({ success: true });
   } catch (error) {

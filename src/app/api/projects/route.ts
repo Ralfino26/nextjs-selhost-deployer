@@ -13,6 +13,12 @@ const createProjectSchema = z.object({
   port: z.number().int().positive(),
   domain: z.string().min(1),
   createDatabase: z.boolean(),
+  envVars: z.array(
+    z.object({
+      key: z.string(),
+      value: z.string(),
+    })
+  ).optional(),
 });
 
 // GET /api/projects - List all projects
@@ -98,7 +104,17 @@ export async function POST(request: NextRequest) {
     // Extract repo name
     const repoName = data.repo.split("/").pop() || "repo";
 
-    // Write database compose if needed (this is the only thing that might not exist yet)
+    // Write docker-compose.yml with chosen port and environment variables
+    const { writeDockerCompose } = await import("@/lib/services/filesystem.service");
+    await writeDockerCompose(
+      projectDir,
+      data.projectName,
+      repoName,
+      data.port,
+      data.envVars || []
+    );
+
+    // Write database compose if needed
     if (data.createDatabase) {
       const { writeDatabaseCompose } = await import("@/lib/services/filesystem.service");
       // Use project name as database name

@@ -81,12 +81,19 @@ export async function writeDockerCompose(
   projectDir: string,
   projectName: string,
   repoName: string,
-  port: number
+  port: number,
+  envVars: { key: string; value: string }[] = []
 ): Promise<void> {
   const dockerDir = join(projectDir, "docker");
   await mkdir(dockerDir, { recursive: true });
 
   const dockerComposePath = join(dockerDir, "docker-compose.yml");
+  
+  // Build environment section
+  const envSection = [
+    "NODE_ENV: production",
+    ...envVars.map((v) => `${v.key}: ${v.value}`),
+  ].join("\n      ");
   
   // Exact structure from your workflow
   const dockerComposeContent = `services:
@@ -99,7 +106,7 @@ export async function writeDockerCompose(
     ports:
       - "${port}:3000"
     environment:
-      NODE_ENV: production
+      ${envSection}
     networks:
       - websites_network
       - infra_network

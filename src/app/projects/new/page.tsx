@@ -42,7 +42,7 @@ export default function NewProjectPage() {
       if (formData.repo && formData.projectName) {
         setLoading(true);
         try {
-          // Initialize project structure: clone repo, create Dockerfile, create docker-compose.yml
+          // Initialize project structure: clone repo, create Dockerfile
           const response = await fetch("/api/projects/initialize", {
             method: "POST",
             headers: {
@@ -60,13 +60,6 @@ export default function NewProjectPage() {
             return;
           }
 
-          const data = await response.json();
-          // Update formData with the port that was assigned
-          setFormData({
-            ...formData,
-            port: data.port.toString(),
-          });
-
           setStep(2);
         } catch (error) {
           console.error("Error initializing project:", error);
@@ -76,7 +69,7 @@ export default function NewProjectPage() {
         }
       }
     } else if (step === 2) {
-      if (formData.domain) {
+      if (formData.domain && formData.port) {
         setStep(3);
       }
     }
@@ -96,6 +89,7 @@ export default function NewProjectPage() {
           port: parseInt(formData.port, 10),
           domain: formData.domain,
           createDatabase: formData.createDatabase,
+          envVars: [], // Environment variables can be added later via the interface
         }),
       });
 
@@ -181,9 +175,17 @@ export default function NewProjectPage() {
                   <Input
                     id="port"
                     className="mt-1"
+                    type="number"
                     value={formData.port}
-                    readOnly
+                    onChange={(e) =>
+                      setFormData({ ...formData, port: e.target.value })
+                    }
+                    placeholder="5000"
+                    min="5000"
                   />
+                  <p className="mt-1 text-xs text-gray-700">
+                    Choose a port for this project (e.g., 5000, 5001, 5002...)
+                  </p>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -218,7 +220,7 @@ export default function NewProjectPage() {
               <Button variant="outline" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button onClick={handleContinue} disabled={!formData.domain}>
+              <Button onClick={handleContinue} disabled={!formData.domain || !formData.port}>
                 Continue
               </Button>
             </div>

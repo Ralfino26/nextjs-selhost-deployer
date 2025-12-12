@@ -13,8 +13,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+# Check if Docker Compose is installed (v2 syntax)
+if ! docker compose version &> /dev/null; then
     echo "❌ Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
@@ -54,11 +54,11 @@ echo "✅ Created data directory"
 # Build and start the container
 echo ""
 echo "🔨 Building Docker image..."
-docker-compose build
+docker compose build
 
 echo ""
 echo "🚀 Starting deployment manager..."
-docker-compose up -d
+docker compose up -d
 
 echo ""
 echo "✅ Installation complete!"
@@ -69,10 +69,10 @@ echo "   2. Open the web interface in your browser"
 echo "   3. Start creating and deploying projects!"
 echo ""
 echo "📝 Useful commands:"
-echo "   - View logs: docker-compose logs -f"
-echo "   - Stop: docker-compose stop"
-echo "   - Start: docker-compose start"
-echo "   - Restart: docker-compose restart"
-echo "   - Remove: docker-compose down"
+echo "   - View logs: docker compose logs -f"
+echo "   - Stop: docker compose stop"
+echo "   - Start: docker compose start"
+echo "   - Restart: docker compose restart"
+echo "   - Remove: docker compose down"
 echo ""
 
