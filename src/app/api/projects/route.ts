@@ -26,9 +26,12 @@ export async function GET() {
   try {
     const projects: Project[] = [];
     const baseDir = config.projectsBaseDir;
+    
+    console.log("Fetching projects from:", baseDir);
 
     try {
       const projectDirs = await readdir(baseDir, { withFileTypes: true });
+      console.log("Found directories:", projectDirs.map(d => d.name));
 
       for (const dir of projectDirs) {
         if (!dir.isDirectory()) continue;
@@ -69,11 +72,20 @@ export async function GET() {
           // Skip projects without docker-compose.yml
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       // Base directory doesn't exist, return empty array
-      console.error("Error reading projects:", error);
+      console.error("Error reading projects directory:", error);
+      console.error("Base directory:", baseDir);
+      console.error("Error code:", error?.code);
+      console.error("Error message:", error?.message);
+      
+      // Return empty array if directory doesn't exist
+      if (error?.code === "ENOENT") {
+        return NextResponse.json([]);
+      }
     }
 
+    console.log("Returning projects:", projects.length);
     return NextResponse.json(projects);
   } catch (error) {
     console.error("Error fetching projects:", error);

@@ -27,7 +27,15 @@ export default function Home() {
       const response = await fetch("/api/projects", {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Error fetching projects:", error);
+        return;
+      }
+      
       const data = await response.json();
+      console.log("Projects fetched:", data);
       setProjects(data);
     } catch (error) {
       console.error("Error fetching projects:", error);
