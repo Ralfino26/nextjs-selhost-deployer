@@ -57,20 +57,23 @@ export async function GET() {
           );
 
           const status = await getProjectStatus(dir.name);
+          
+          // Try to read domain from metadata.json
+          let domain = `${dir.name}.byralf.com`; // Default
+          try {
+            const metadataPath = join(baseDir, dir.name, "metadata.json");
+            const metadataContent = await readFile(metadataPath, "utf-8");
+            const metadata = JSON.parse(metadataContent);
+            if (metadata.domain) {
+              domain = metadata.domain;
+            }
+          } catch {
+            // No metadata file, use default
+          }
+
           const hasDatabase = projectSubDirs.some(
             (d) => d.isDirectory() && d.name === "database"
           );
-
-          // Try to get domain from Nginx Proxy Manager
-          const { getDomainFromNPM, getDomainFromContainer } = await import("@/lib/services/nginx.service");
-          let domain = await getDomainFromNPM(dir.name);
-          if (!domain) {
-            domain = await getDomainFromContainer(dir.name);
-          }
-          // Fallback to default if not found
-          if (!domain) {
-            domain = `${dir.name}.byralf.com`;
-          }
 
           projects.push({
             id: dir.name,
@@ -147,6 +150,15 @@ export async function POST(request: NextRequest) {
       await writeDatabaseCompose(projectDir, data.projectName, data.projectName);
       await startDatabase(data.projectName);
     }
+
+    // Save metadata (domain, etc.)
+    const { writeFile } = await import("fs/promises");
+    const metadataPath = join(projectDir, "metadata.json");
+    await writeFile(
+      metadataPath,
+      JSON.stringify({ domain: data.domain }, null, 2),
+      "utf-8"
+    );
 
     // Deploy the project
     await deployProject(data.projectName);

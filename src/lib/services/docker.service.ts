@@ -92,18 +92,43 @@ export async function getLogs(
   projectName: string,
   lines: number = 100
 ): Promise<string> {
-  const docker = await getDocker();
-  const container = docker.getContainer(projectName);
-  
   try {
+    const docker = await getDocker();
+    const container = docker.getContainer(projectName);
+    
     const logs = await container.logs({
       stdout: true,
       stderr: true,
       tail: lines,
+      timestamps: false,
     });
-    return logs.toString();
-  } catch (error) {
-    return `Error fetching logs: ${error}`;
+    
+    // Convert buffer to string and clean up
+    let logOutput = logs.toString("utf-8");
+    
+    // Remove ANSI color codes if present
+    logOutput = logOutput.replace(/\x1b\[[0-9;]*m/g, "");
+    
+    return logOutput;
+  } catch (error: any) {
+    // If container doesn't exist, try using docker compose logs
+    try {
+      const projectDir = join(config.projectsBaseDir, projectName);
+      const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+      
+      const { exec } = await import("child_process");
+      const { promisify } = await import("util");
+      const execAsync = promisify(exec);
+      
+      const result = await execAsync(
+        `docker compose -f ${dockerComposePath} logs --tail=${lines}`,
+        { cwd: join(projectDir, "docker") }
+      );
+      
+      return result.stdout || result.stderr || "No logs available";
+    } catch (composeError: any) {
+      return `Error fetching logs: ${error?.message || error || "Unknown error"}`;
+    }
   }
 }
 

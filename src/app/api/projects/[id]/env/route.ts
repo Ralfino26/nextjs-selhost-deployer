@@ -38,45 +38,35 @@ export async function GET(
       );
     }
 
-    // Read environment variables from .env file in repo directory
-    const envFilePath = join(projectDir, repoDir.name, ".env");
-    const variables: EnvironmentVariable[] = [];
+    // Read environment variables from docker-compose.yml
+    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
     try {
-      const content = await readFile(envFilePath, "utf-8");
+      const content = await readFile(dockerComposePath, "utf-8");
+      const variables: EnvironmentVariable[] = [];
       
-      // Parse .env file (key=value format)
-      const lines = content.split("\n");
-      for (const line of lines) {
-        const trimmed = line.trim();
-        // Skip empty lines and comments
-        if (!trimmed || trimmed.startsWith("#")) {
-          continue;
-        }
-        
-        // Parse KEY=VALUE or KEY="VALUE"
-        const match = trimmed.match(/^([^=]+)=(.*)$/);
-        if (match) {
-          const key = match[1].trim();
-          let value = match[2].trim();
-          
-          // Remove quotes if present
-          if ((value.startsWith('"') && value.endsWith('"')) || 
-              (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
+      // Parse environment section from docker-compose.yml
+      const envMatch = content.match(/environment:\s*\n((?:\s+[^:\n]+:[^\n]+\n?)+)/);
+      if (envMatch) {
+        const envLines = envMatch[1].trim().split("\n");
+        for (const line of envLines) {
+          const match = line.trim().match(/^([^:]+):\s*(.+)$/);
+          if (match) {
+            const key = match[1].trim();
+            const value = match[2].trim();
+            // Skip NODE_ENV as it's always there
+            if (key !== "NODE_ENV") {
+              variables.push({ key, value });
+            }
           }
-          
-          variables.push({ key, value });
         }
       }
-    } catch (error: any) {
-      // .env file doesn't exist, return empty array
-      if (error?.code !== "ENOENT") {
-        console.error("Error reading .env file:", error);
-      }
-    }
 
-    return NextResponse.json({ variables });
+      return NextResponse.json({ variables });
+    } catch {
+      // docker-compose.yml doesn't exist or can't be read, return empty
+      return NextResponse.json({ variables: [] });
+    }
   } catch (error) {
     console.error("Error fetching environment variables:", error);
     return NextResponse.json(
@@ -113,21 +103,19 @@ export async function POST(
       );
     }
 
-    // Write environment variables to .env file in repo directory
-    const envFilePath = join(projectDir, repoDir.name, ".env");
+    // Update docker-compose.yml with new environment variables
+    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
     
-    // Build .env file content
-    const envContent = data.variables
-      .map((v) => {
-        // Escape value if it contains spaces or special characters
-        const value = v.value.includes(" ") || v.value.includes("=") 
-          ? `"${v.value.replace(/"/g, '\\"')}"` 
-          : v.value;
-        return `${v.key}=${value}`;
-      })
-      .join("\n");
+    // Read existing docker-compose.yml
+    const existingContent = await readFile(dockerComposePath, "utf-8");
     
-    await writeFile(envFilePath, envContent, "utf-8");
+    // Extract port from existing compose file
+    const portMatch = existingContent.match(/ports:\s*\n\s+-\s+"(\d+):3000"/);
+    const port = portMatch ? parseInt(portMatch[1], 10) : 5000;
+    
+    // Rebuild docker-compose.yml with new environment variables
+    const { writeDockerCompose } = await import("@/lib/services/filesystem.service");
+    await writeDockerCompose(projectDir, projectName, repoDir.name, port, data.variables);
     
     // Restart container to apply new environment variables
     const { restartProject } = await import("@/lib/services/docker.service");

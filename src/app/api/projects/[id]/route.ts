@@ -33,15 +33,17 @@ export async function GET(
         (d) => d.isDirectory() && d.name === "database"
       );
 
-      // Try to get domain from Nginx Proxy Manager
-      const { getDomainFromNPM, getDomainFromContainer } = await import("@/lib/services/nginx.service");
-      let domain = await getDomainFromNPM(projectName);
-      if (!domain) {
-        domain = await getDomainFromContainer(projectName);
-      }
-      // Fallback to default if not found
-      if (!domain) {
-        domain = `${projectName}.byralf.com`;
+      // Try to read domain from metadata.json
+      let domain = `${projectName}.byralf.com`; // Default
+      try {
+        const metadataPath = join(projectDir, "metadata.json");
+        const metadataContent = await readFile(metadataPath, "utf-8");
+        const metadata = JSON.parse(metadataContent);
+        if (metadata.domain) {
+          domain = metadata.domain;
+        }
+      } catch {
+        // No metadata file, use default
       }
 
       const project: Project = {
