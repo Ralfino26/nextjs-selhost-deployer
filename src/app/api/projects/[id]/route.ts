@@ -28,28 +28,42 @@ export async function GET(
         (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
       );
 
+      if (!repoDir) {
+        return NextResponse.json(
+          { error: "Repository directory not found" },
+          { status: 404 }
+        );
+      }
+
       const status = await getProjectStatus(projectName);
       const hasDatabase = projectSubDirs.some(
         (d) => d.isDirectory() && d.name === "database"
       );
 
-      // Try to read domain from metadata.json
-      let domain = `${projectName}.byralf.com`; // Default
+      // Read domain from metadata.json (required)
+      const metadataPath = join(projectDir, "metadata.json");
+      let domain: string;
       try {
-        const metadataPath = join(projectDir, "metadata.json");
         const metadataContent = await readFile(metadataPath, "utf-8");
         const metadata = JSON.parse(metadataContent);
-        if (metadata.domain) {
-          domain = metadata.domain;
+        if (!metadata.domain) {
+          return NextResponse.json(
+            { error: "Domain not found in metadata.json" },
+            { status: 404 }
+          );
         }
-      } catch {
-        // No metadata file, use default
+        domain = metadata.domain;
+      } catch (error: any) {
+        return NextResponse.json(
+          { error: `Failed to read metadata.json: ${error?.message || "File not found"}` },
+          { status: 404 }
+        );
       }
 
       const project: Project = {
         id: projectName,
         name: projectName,
-        repo: repoDir?.name || "unknown",
+        repo: repoDir.name,
         port,
         domain,
         createDatabase: hasDatabase,

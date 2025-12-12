@@ -56,19 +56,27 @@ export async function GET() {
             (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
           );
 
+          if (!repoDir) {
+            console.warn(`Skipping project ${dir.name}: no repository directory found`);
+            continue;
+          }
+
           const status = await getProjectStatus(dir.name);
           
-          // Try to read domain from metadata.json
-          let domain = `${dir.name}.byralf.com`; // Default
+          // Read domain from metadata.json (required)
+          const metadataPath = join(baseDir, dir.name, "metadata.json");
+          let domain: string;
           try {
-            const metadataPath = join(baseDir, dir.name, "metadata.json");
             const metadataContent = await readFile(metadataPath, "utf-8");
             const metadata = JSON.parse(metadataContent);
-            if (metadata.domain) {
-              domain = metadata.domain;
+            if (!metadata.domain) {
+              throw new Error("Domain not found in metadata.json");
             }
-          } catch {
-            // No metadata file, use default
+            domain = metadata.domain;
+          } catch (error) {
+            // Skip projects without valid metadata.json
+            console.warn(`Skipping project ${dir.name}: ${error}`);
+            continue;
           }
 
           const hasDatabase = projectSubDirs.some(
@@ -78,7 +86,7 @@ export async function GET() {
           projects.push({
             id: dir.name,
             name: dir.name,
-            repo: repoDir?.name || "unknown",
+            repo: repoDir.name,
             port,
             domain,
             createDatabase: hasDatabase,
