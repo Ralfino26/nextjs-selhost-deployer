@@ -61,18 +61,13 @@ export async function GET() {
             continue;
           }
 
-          // Read domain from metadata.json first
-          const metadataPath = join(baseDir, dir.name, "metadata.json");
+          // Get domain from Nginx Proxy Manager
+          const { getDomainForProject } = await import("@/lib/services/nginx.service");
           let domain: string | null = null;
           try {
-            const metadataContent = await readFile(metadataPath, "utf-8");
-            const metadata = JSON.parse(metadataContent);
-            if (metadata.domain) {
-              domain = metadata.domain;
-            }
+            domain = await getDomainForProject(dir.name, port);
           } catch (error) {
-            // metadata.json doesn't exist or is invalid - will show error in UI
-            console.warn(`No metadata.json for project ${dir.name}: ${error}`);
+            console.warn(`Failed to get domain from NPM for ${dir.name}: ${error}`);
           }
 
           // Get status - only if domain exists, otherwise mark as Error
@@ -90,7 +85,7 @@ export async function GET() {
             name: dir.name,
             repo: repoDir.name,
             port,
-            domain: domain || "ERROR: metadata.json missing",
+            domain: domain || "ERROR: Domain not found in Nginx Proxy Manager",
             createDatabase: hasDatabase,
             status,
             directory: join(baseDir, dir.name),
@@ -160,15 +155,6 @@ export async function POST(request: NextRequest) {
       await writeDatabaseCompose(projectDir, data.projectName, data.projectName);
       await startDatabase(data.projectName);
     }
-
-    // Save metadata (domain, etc.)
-    const { writeFile } = await import("fs/promises");
-    const metadataPath = join(projectDir, "metadata.json");
-    await writeFile(
-      metadataPath,
-      JSON.stringify({ domain: data.domain }, null, 2),
-      "utf-8"
-    );
 
     // Deploy the project
     await deployProject(data.projectName);

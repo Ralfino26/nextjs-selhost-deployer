@@ -22,6 +22,9 @@ interface Config {
   startingPort: number;
   websitesNetwork: string;
   infraNetwork: string;
+  npmUrl?: string;
+  npmEmail?: string;
+  npmPassword?: string;
 }
 
 export default function SettingsPage() {
@@ -34,6 +37,9 @@ export default function SettingsPage() {
     startingPort: 5000,
     websitesNetwork: "websites_network",
     infraNetwork: "infra_network",
+    npmUrl: "http://nginx-proxy-manager:81",
+    npmEmail: "",
+    npmPassword: "",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");

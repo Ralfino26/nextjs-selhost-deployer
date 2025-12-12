@@ -13,6 +13,9 @@ const configSchema = z.object({
   startingPort: z.number(),
   websitesNetwork: z.string(),
   infraNetwork: z.string(),
+  npmUrl: z.string().optional(),
+  npmEmail: z.string().optional(),
+  npmPassword: z.string().optional(),
 });
 
 const CONFIG_FILE = join(process.cwd(), "data", "config.json");

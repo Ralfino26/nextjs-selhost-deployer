@@ -13,6 +13,9 @@ interface ConfigData {
   startingPort: number;
   websitesNetwork: string;
   infraNetwork: string;
+  npmUrl?: string;
+  npmEmail?: string;
+  npmPassword?: string;
 }
 
 let cachedConfig: ConfigData | null = null;
@@ -44,6 +47,9 @@ function loadConfig(): ConfigData {
     startingPort: 5000,
     websitesNetwork: "websites_network",
     infraNetwork: "infra_network",
+    npmUrl: process.env.NPM_URL || "http://nginx-proxy-manager:81",
+    npmEmail: process.env.NPM_EMAIL || "",
+    npmPassword: process.env.NPM_PASSWORD || "",
   };
   
   cachedConfig = defaults;
