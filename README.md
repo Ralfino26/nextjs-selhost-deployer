@@ -8,7 +8,7 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 - **GitHub Integration**: Clone and deploy GitHub repositories
 - **Docker Automation**: Automatic Dockerfile and docker-compose.yml generation
 - **Database Support**: Optional PostgreSQL/MongoDB database setup
-- **Port Management**: Automatic port assignment
+- **Port Management**: Manual port selection per project
 - **Environment Variables**: Manage project environment variables
 - **Container Management**: Deploy, restart, update, and view logs
 
@@ -20,43 +20,26 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 
 ## Quick Installation on VPS
 
-### Option 1: Using the Installation Script (Recommended)
+Simply clone the repository and run docker compose:
 
 ```bash
 # Clone the repository
 git clone https://github.com/Ralfino26/nextjs-selhost-deployer.git
 cd nextjs-selhost-deployer
 
-# Run the installation script
-./install.sh
-```
-
-The script will:
-- Check for Docker and Docker Compose
-- Create `.env` file from `.env.example`
-- Create necessary directories
-- Build and start the Docker container
-
-### Option 2: Manual Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/Ralfino26/nextjs-selhost-deployer.git
-cd nextjs-selhost-deployer
-
-# Create .env file
+# Create .env file (optional, defaults work)
 cp .env.example .env
 
-# Edit .env file with your configuration
+# Edit .env if needed (optional)
 nano .env
 
-# Create data directory
-mkdir -p data
-
-# Build and start
-docker-compose build
-docker-compose up -d
+# Start the deployment manager
+docker compose up -d
 ```
+
+That's it! The deployment manager will be available at `http://localhost:3000` (or your configured port).
+
+**Note:** The first time you run this, Docker will build the image. Subsequent starts will be instant.
 
 ## Configuration
 
@@ -70,8 +53,8 @@ PORT=3000
 # This path will be mounted as a volume
 PROJECTS_BASE_DIR=/srv/vps/websites
 
-# Starting port for new projects (will auto-increment)
-STARTING_PORT=3000
+# Starting port for new projects (default, users choose manually)
+STARTING_PORT=5000
 
 # Docker network name for deployed projects
 DOCKER_NETWORK=deployment-network
@@ -159,23 +142,23 @@ PROJECTS_BASE_DIR/
 
 ```bash
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop the deployment manager
-docker-compose stop
+docker compose stop
 
 # Start the deployment manager
-docker-compose start
+docker compose start
 
 # Restart the deployment manager
-docker-compose restart
+docker compose restart
 
 # Stop and remove containers
-docker-compose down
+docker compose down
 
 # Rebuild after code changes
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
 
 ## Next.js Project Requirements
