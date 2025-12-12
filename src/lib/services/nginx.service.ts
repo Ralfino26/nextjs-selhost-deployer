@@ -55,9 +55,16 @@ async function getNPMToken(): Promise<string> {
     const data: NPMTokenResponse = await response.json();
     npmToken = data.token;
     npmTokenExpiry = Date.now() + 3600000; // 1 hour
+    console.log("Successfully authenticated with NPM");
     return npmToken;
   } catch (error: any) {
-    throw new Error(`Failed to get NPM token: ${error?.message || error}`);
+    const errorMsg = error?.message || error;
+    console.error(`NPM connection error: ${errorMsg}`);
+    // If it's a network error, provide helpful message
+    if (errorMsg.includes("fetch failed") || errorMsg.includes("ECONNREFUSED") || errorMsg.includes("timeout")) {
+      throw new Error(`Cannot connect to NPM at ${npmUrl}. Make sure NPM is running and the URL is correct. If NPM runs on the host, try: http://host.docker.internal:81 or http://<host-ip>:81`);
+    }
+    throw new Error(`Failed to get NPM token: ${errorMsg}`);
   }
 }
 
