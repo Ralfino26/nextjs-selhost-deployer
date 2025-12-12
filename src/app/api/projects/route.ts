@@ -57,14 +57,28 @@ export async function GET() {
           );
 
           const status = await getProjectStatus(dir.name);
+          const hasDatabase = projectSubDirs.some(
+            (d) => d.isDirectory() && d.name === "database"
+          );
+
+          // Try to get domain from Nginx Proxy Manager
+          const { getDomainFromNPM, getDomainFromContainer } = await import("@/lib/services/nginx.service");
+          let domain = await getDomainFromNPM(dir.name);
+          if (!domain) {
+            domain = await getDomainFromContainer(dir.name);
+          }
+          // Fallback to default if not found
+          if (!domain) {
+            domain = `${dir.name}.byralf.com`;
+          }
 
           projects.push({
             id: dir.name,
             name: dir.name,
             repo: repoDir?.name || "unknown",
             port,
-            domain: `${dir.name}.byralf.com`, // Placeholder
-            createDatabase: false, // Would need to check if database dir exists
+            domain,
+            createDatabase: hasDatabase,
             status,
             directory: join(baseDir, dir.name),
           });

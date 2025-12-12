@@ -107,6 +107,13 @@ export async function writeDockerCompose(
   ].join("\n      ");
   
   // Exact structure from your workflow
+  // Mount .env file from repo directory if it exists
+  const envFileExists = existsSync(join(projectDir, repoName, ".env"));
+  const envFileMount = envFileExists 
+    ? `    env_file:
+      - ../${repoName}/.env`
+    : "";
+
   const dockerComposeContent = `services:
   ${projectName}:
     container_name: ${projectName}
@@ -118,6 +125,7 @@ export async function writeDockerCompose(
       - "${port}:3000"
     environment:
       ${envSection}
+${envFileMount}
     networks:
       - websites_network
       - infra_network

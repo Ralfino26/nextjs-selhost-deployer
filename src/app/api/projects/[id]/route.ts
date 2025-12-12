@@ -33,12 +33,23 @@ export async function GET(
         (d) => d.isDirectory() && d.name === "database"
       );
 
+      // Try to get domain from Nginx Proxy Manager
+      const { getDomainFromNPM, getDomainFromContainer } = await import("@/lib/services/nginx.service");
+      let domain = await getDomainFromNPM(projectName);
+      if (!domain) {
+        domain = await getDomainFromContainer(projectName);
+      }
+      // Fallback to default if not found
+      if (!domain) {
+        domain = `${projectName}.byralf.com`;
+      }
+
       const project: Project = {
         id: projectName,
         name: projectName,
         repo: repoDir?.name || "unknown",
         port,
-        domain: `${projectName}.byralf.com`,
+        domain,
         createDatabase: hasDatabase,
         status,
         directory: projectDir,
