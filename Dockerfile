@@ -40,8 +40,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Install Docker CLI, Docker Compose plugin, and bash for exec
-RUN apk add --no-cache docker-cli docker-cli-compose git bash
+# Install Docker CLI, bash, and git
+RUN apk add --no-cache docker-cli git bash curl
+
+# Install Docker Compose V2 plugin
+RUN mkdir -p /usr/local/lib/docker/cli-plugins && \
+    curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose && \
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # Keep root user to access Docker socket (required for dockerode)
 # The container needs root privileges to manage Docker containers
