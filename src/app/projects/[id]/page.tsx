@@ -103,6 +103,8 @@ export default function ProjectDetailPage() {
         throw new Error("No response body");
       }
 
+      let deploymentComplete = false;
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -125,14 +127,11 @@ export default function ProjectDetailPage() {
                 }, 100);
               }
               if (data.log === "DONE") {
+                deploymentComplete = true;
                 setActionLoading(null);
                 setActionMessage({ type: "success", text: "Project deployed successfully" });
                 await fetchProject();
-                // Close modal after 2 seconds
-                setTimeout(() => {
-                  setShowDeployLogs(false);
-                  setDeployLogs("");
-                }, 2000);
+                // Don't auto-close, let user close manually
                 return;
               }
             } catch (e) {
@@ -141,9 +140,14 @@ export default function ProjectDetailPage() {
           }
         }
       }
+
+      if (!deploymentComplete) {
+        setActionLoading(null);
+        setDeployLogs((prev) => prev + "\n\n⚠️ Deployment stream ended unexpectedly\n");
+      }
     } catch (error: any) {
       console.error("Error deploying:", error);
-      setDeployLogs((prev) => prev + `\n❌ Error: ${error.message}\n`);
+      setDeployLogs((prev) => prev + `\n\n❌ Error: ${error.message}\n`);
       setActionMessage({ type: "error", text: error.message || "Failed to deploy project" });
       setActionLoading(null);
     }
@@ -304,10 +308,29 @@ export default function ProjectDetailPage() {
 
       {/* Deploy Logs Modal */}
       {showDeployLogs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-4xl rounded-lg bg-white shadow-lg">
-            <div className="flex items-center justify-between border-b border-gray-200 p-4">
-              <h2 className="text-lg font-semibold">Deployment Logs</h2>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && actionLoading !== "deploy") {
+              setShowDeployLogs(false);
+              setDeployLogs("");
+            }
+          }}
+        >
+          <div className="w-full max-w-5xl rounded-lg bg-white shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className={`h-2 w-2 rounded-full ${
+                  actionLoading === "deploy" ? "bg-yellow-500 animate-pulse" : "bg-green-500"
+                }`} />
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Deployment Logs</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {actionLoading === "deploy" ? "Deployment in progress..." : "Deployment completed"}
+                  </p>
+                </div>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -316,18 +339,85 @@ export default function ProjectDetailPage() {
                   setDeployLogs("");
                 }}
                 disabled={actionLoading === "deploy"}
+                className="disabled:opacity-50"
               >
-                {actionLoading === "deploy" ? "Deploying..." : "Close"}
+                {actionLoading === "deploy" ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+                    Deploying...
+                  </span>
+                ) : (
+                  "Close"
+                )}
               </Button>
             </div>
-            <div className="max-h-[70vh] overflow-auto p-4">
-              <pre
-                id="deploy-logs"
-                className="rounded bg-gray-900 p-4 text-xs text-green-400 font-mono whitespace-pre-wrap"
-                style={{ maxHeight: "60vh", overflow: "auto" }}
-              >
-                {deployLogs || "Starting deployment...\n"}
-              </pre>
+
+            {/* Logs Container */}
+            <div className="bg-gray-900 p-6">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <span>📋</span>
+                  <span>Live deployment output</span>
+                </div>
+                {deployLogs && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const logElement = document.getElementById("deploy-logs");
+                      if (logElement) {
+                        logElement.scrollTop = logElement.scrollHeight;
+                      }
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-300 h-6"
+                  >
+                    Scroll to bottom
+                  </Button>
+                )}
+              </div>
+              <div className="relative">
+                <pre
+                  id="deploy-logs"
+                  className="rounded-lg bg-black p-4 text-xs text-green-400 font-mono whitespace-pre-wrap overflow-auto"
+                  style={{ 
+                    maxHeight: "60vh", 
+                    minHeight: "400px",
+                    scrollBehavior: "smooth"
+                  }}
+                >
+                  {deployLogs || (
+                    <span className="text-gray-500">
+                      <span className="inline-block animate-pulse">▋</span> Initializing deployment...
+                    </span>
+                  )}
+                </pre>
+                {actionLoading === "deploy" && (
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2 text-xs text-gray-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span>Streaming...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 bg-gray-50 px-6 py-3">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Project: {project?.name}</span>
+                <span>
+                  {actionLoading === "deploy" ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                      In progress
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2 text-green-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                      Completed
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>
