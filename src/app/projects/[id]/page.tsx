@@ -24,6 +24,7 @@ export default function ProjectDetailPage() {
   const [logs, setLogs] = useState("");
   const [envVariables, setEnvVariables] = useState<EnvironmentVariable[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetchProject();
@@ -79,6 +80,7 @@ export default function ProjectDetailPage() {
 
   const handleDeploy = async () => {
     setActionLoading("deploy");
+    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/deploy`, {
@@ -86,10 +88,16 @@ export default function ProjectDetailPage() {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
+        const data = await response.json();
+        setActionMessage({ type: "success", text: data.message || "Project deployed successfully" });
         await fetchProject();
+      } else {
+        const error = await response.json();
+        setActionMessage({ type: "error", text: error.error || "Failed to deploy project" });
       }
     } catch (error) {
       console.error("Error deploying:", error);
+      setActionMessage({ type: "error", text: "Failed to deploy project" });
     } finally {
       setActionLoading(null);
     }
@@ -97,6 +105,7 @@ export default function ProjectDetailPage() {
 
   const handleUpdate = async () => {
     setActionLoading("update");
+    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/update`, {
@@ -104,10 +113,16 @@ export default function ProjectDetailPage() {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
+        const data = await response.json();
+        setActionMessage({ type: "success", text: data.message || "Project updated successfully" });
         await fetchProject();
+      } else {
+        const error = await response.json();
+        setActionMessage({ type: "error", text: error.error || "Failed to update project" });
       }
     } catch (error) {
       console.error("Error updating:", error);
+      setActionMessage({ type: "error", text: "Failed to update project" });
     } finally {
       setActionLoading(null);
     }
@@ -115,6 +130,7 @@ export default function ProjectDetailPage() {
 
   const handleRestart = async () => {
     setActionLoading("restart");
+    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/restart`, {
@@ -122,10 +138,16 @@ export default function ProjectDetailPage() {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
+        const data = await response.json();
+        setActionMessage({ type: "success", text: data.message || "Project restarted successfully" });
         await fetchProject();
+      } else {
+        const error = await response.json();
+        setActionMessage({ type: "error", text: error.error || "Failed to restart project" });
       }
     } catch (error) {
       console.error("Error restarting:", error);
+      setActionMessage({ type: "error", text: "Failed to restart project" });
     } finally {
       setActionLoading(null);
     }
@@ -137,6 +159,7 @@ export default function ProjectDetailPage() {
     }
 
     setActionLoading("delete");
+    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}`, {
@@ -145,10 +168,14 @@ export default function ProjectDetailPage() {
       });
       if (response.ok) {
         router.push("/");
+      } else {
+        const error = await response.json();
+        setActionMessage({ type: "error", text: error.error || "Failed to delete project" });
+        setActionLoading(null);
       }
     } catch (error) {
       console.error("Error deleting:", error);
-    } finally {
+      setActionMessage({ type: "error", text: "Failed to delete project" });
       setActionLoading(null);
     }
   };
@@ -219,6 +246,15 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {actionMessage && (
+        <div className={`mb-4 rounded-md p-3 ${
+          actionMessage.type === "success" 
+            ? "bg-green-50 text-green-800" 
+            : "bg-red-50 text-red-800"
+        }`}>
+          {actionMessage.text}
+        </div>
+      )}
       <div className="mb-6 flex gap-2">
         <Button
           onClick={handleDeploy}
