@@ -21,6 +21,13 @@ RUN if [ -f bun.lock ]; then \
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+
+# Install bun if needed (for building)
+RUN if [ -f bun.lock ]; then \
+      apk add --no-cache curl unzip bash && \
+      curl -fsSL https://bun.sh/install | bash; \
+    fi
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
