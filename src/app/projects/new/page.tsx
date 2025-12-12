@@ -34,28 +34,46 @@ export default function NewProjectPage() {
     domain: "",
   });
 
-  // Fetch next available port when entering step 2
-  useEffect(() => {
-    if (step === 2 && !formData.port) {
-      fetchNextPort();
-    }
-  }, [step]);
+  // Port is now set during initialization, no need to fetch separately
 
-  const fetchNextPort = async () => {
-    try {
-      const response = await fetch("/api/ports/next");
-      const data = await response.json();
-      setFormData({ ...formData, port: data.port.toString() });
-    } catch (error) {
-      console.error("Error fetching next port:", error);
-      setFormData({ ...formData, port: "3000" });
-    }
-  };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (step === 1) {
       if (formData.repo && formData.projectName) {
-        setStep(2);
+        setLoading(true);
+        try {
+          // Initialize project structure: clone repo, create Dockerfile, create docker-compose.yml
+          const response = await fetch("/api/projects/initialize", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              repo: formData.repo,
+              projectName: formData.projectName,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            alert(`Error initializing project: ${error.error || "Unknown error"}`);
+            return;
+          }
+
+          const data = await response.json();
+          // Update formData with the port that was assigned
+          setFormData({
+            ...formData,
+            port: data.port.toString(),
+          });
+
+          setStep(2);
+        } catch (error) {
+          console.error("Error initializing project:", error);
+          alert("Failed to initialize project structure");
+        } finally {
+          setLoading(false);
+        }
       }
     } else if (step === 2) {
       if (formData.domain) {
@@ -142,8 +160,11 @@ export default function NewProjectPage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleContinue} disabled={!formData.repo || !formData.projectName}>
-                Continue
+              <Button
+                onClick={handleContinue}
+                disabled={!formData.repo || !formData.projectName || loading}
+              >
+                {loading ? "Initializing..." : "Continue"}
               </Button>
             </div>
           </div>

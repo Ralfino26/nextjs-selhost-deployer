@@ -24,8 +24,20 @@ export async function cloneRepository(
   const repoName = repoUrl.split("/").pop()?.replace(".git", "") || "repo";
   const cloneDir = join(targetDir, repoName);
   
+  // Use GitHub token if available (for private repos)
+  const githubToken = config.githubToken;
+  let cloneUrl = repoUrl;
+  
+  if (githubToken && repoUrl.includes("github.com")) {
+    // Insert token into URL for authentication
+    cloneUrl = repoUrl.replace(
+      "https://github.com/",
+      `https://${githubToken}@github.com/`
+    );
+  }
+  
   // Clone the repository
-  await git.clone(repoUrl, cloneDir);
+  await git.clone(cloneUrl, cloneDir);
 }
 
 export async function writeDockerfile(

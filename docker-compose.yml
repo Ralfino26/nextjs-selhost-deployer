@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  deployment-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deployment-manager
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      # Base directory where projects will be stored
+      - PROJECTS_BASE_DIR=${PROJECTS_BASE_DIR:-/srv/vps/websites}
+      # Starting port for new projects
+      - STARTING_PORT=${STARTING_PORT:-3000}
+      # Docker network name
+      - DOCKER_NETWORK=${DOCKER_NETWORK:-deployment-network}
+      # GitHub API token (optional, for private repos)
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Database credentials
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_DEFAULT_DATABASE=${DB_DEFAULT_DATABASE:-postgres}
+    volumes:
+      # Mount Docker socket to allow container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount projects directory (use absolute path from .env)
+      - ${PROJECTS_BASE_DIR:-./projects}:/srv/vps/websites
+      # Mount data directory for port registry (optional)
+      - ./data:/app/data
+    networks:
+      - deployment-network
+    # Access Docker socket (required for dockerode)
+    # The container needs to be able to execute docker commands
+    # Using privileged mode for simplicity - in production consider docker-in-docker or socket mounting with proper permissions
+    privileged: true
+    # Alternative: Add user to docker group (requires host setup)
+    # user: "1000:999"  # Adjust to match docker group on host
+
+networks:
+  deployment-network:
+    driver: bridge
+

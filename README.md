@@ -7,48 +7,180 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 - **Project Management**: Create, view, and delete projects
 - **GitHub Integration**: Clone and deploy GitHub repositories
 - **Docker Automation**: Automatic Dockerfile and docker-compose.yml generation
-- **Database Support**: Optional PostgreSQL database setup
+- **Database Support**: Optional PostgreSQL/MongoDB database setup
 - **Port Management**: Automatic port assignment
 - **Environment Variables**: Manage project environment variables
 - **Container Management**: Deploy, restart, update, and view logs
 
 ## Requirements
 
-- Node.js 20+ or Bun
-- Docker and Docker Compose installed
-- Access to Docker socket (usually requires running as root or docker group)
-- Git installed
-- Write access to `/srv/vps/websites` (or configure `PROJECTS_BASE_DIR`)
+- Docker and Docker Compose installed on your VPS
+- Git installed (included in Docker image)
+- Access to Docker socket (mounted in container)
+
+## Quick Installation on VPS
+
+### Option 1: Using the Installation Script (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/nextjs-selhost-deployer.git
+cd nextjs-selhost-deployer
+
+# Run the installation script
+./install.sh
+```
+
+The script will:
+- Check for Docker and Docker Compose
+- Create `.env` file from `.env.example`
+- Create necessary directories
+- Build and start the Docker container
+
+### Option 2: Manual Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/nextjs-selhost-deployer.git
+cd nextjs-selhost-deployer
+
+# Create .env file
+cp .env.example .env
+
+# Edit .env file with your configuration
+nano .env
+
+# Create data directory
+mkdir -p data
+
+# Build and start
+docker-compose build
+docker-compose up -d
+```
 
 ## Configuration
 
-Create a `.env.local` file in the root directory:
+Edit the `.env` file to configure the deployment manager:
 
 ```env
+# Port for the deployment manager web interface
+PORT=3000
+
+# Base directory where all projects will be stored
+# This path will be mounted as a volume
 PROJECTS_BASE_DIR=/srv/vps/websites
+
+# Starting port for new projects (will auto-increment)
+STARTING_PORT=3000
+
+# Docker network name for deployed projects
+DOCKER_NETWORK=deployment-network
+
+# GitHub API token (optional, required for private repositories)
+# Generate at: https://github.com/settings/tokens
+GITHUB_TOKEN=your_github_token_here
+
+# Database credentials (for projects that use databases)
 DB_USER=postgres
-DB_PASSWORD=your_secure_password
+DB_PASSWORD=your_secure_password_here
+DB_DEFAULT_DATABASE=postgres
 ```
 
-## Project Structure
+### Important Configuration Options
 
-When you create a project, the following structure is created:
+- **PROJECTS_BASE_DIR**: Change this to where you want projects stored on your VPS
+  - Default: `/srv/vps/websites`
+  - Example: `/home/user/projects` or `/var/www/projects`
+  
+- **GITHUB_TOKEN**: Required if you want to clone private repositories
+  - Generate at: https://github.com/settings/tokens
+  - Needs `repo` scope for private repos
+
+- **DB_PASSWORD**: Change this to a secure password for database projects
+
+## Accessing the Dashboard
+
+After installation, access the dashboard at:
+- **Local**: http://localhost:3000
+- **VPS**: http://your-vps-ip:3000
+
+## Usage
+
+### 1. Create a Project
+
+1. Click **"New Project"** in the top right
+2. **Step 1**: Select GitHub repository and enter project name
+   - The system will automatically:
+     - Clone the repository
+     - Create folder structure
+     - Generate Dockerfile
+     - Create docker-compose.yml
+     - Assign a port
+3. **Step 2**: Configure domain and database (optional)
+4. **Step 3**: Review and create
+
+### 2. Project Structure
+
+When you create a project, the following structure is automatically generated:
 
 ```
-/srv/vps/websites/
+PROJECTS_BASE_DIR/
 └── project-name/
-    ├── repo-name/          # Cloned GitHub repository
-    │   ├── Dockerfile      # Auto-generated if not present
-    │   └── .env.local      # Environment variables
+    ├── repo-name/              # Cloned GitHub repository
+    │   ├── Dockerfile          # Auto-generated if not present
+    │   └── .env.local           # Environment variables
     ├── docker/
-    │   └── docker-compose.yml
-    └── database/           # Only if database is enabled
-        └── docker-compose.yml
+    │   └── docker-compose.yml   # Auto-generated
+    └── database/                # Only if database is enabled
+        └── docker-compose.yml   # Only if database is enabled
+```
+
+### 3. Manage Projects
+
+- **View Projects**: See all projects on the home page
+- **Project Details**: Click "Open Project" to view details
+- **Deploy**: Build and start the container
+- **Restart**: Restart a running container
+- **Update**: Pull latest changes from GitHub and redeploy
+- **Delete**: Remove project and containers
+
+### 4. Environment Variables
+
+- Go to project details → **Environment Variables** tab
+- Add variables and click **Save**
+- Variables are saved to `.env.local` in the project directory
+
+### 5. View Logs
+
+- Go to project details → **Logs** tab
+- Click **Refresh** to load container logs
+
+## Docker Commands
+
+```bash
+# View logs
+docker-compose logs -f
+
+# Stop the deployment manager
+docker-compose stop
+
+# Start the deployment manager
+docker-compose start
+
+# Restart the deployment manager
+docker-compose restart
+
+# Stop and remove containers
+docker-compose down
+
+# Rebuild after code changes
+docker-compose build
+docker-compose up -d
 ```
 
 ## Next.js Project Requirements
 
-For optimal deployment, your Next.js project should:
+For optimal deployment, your Next.js projects should:
 
 1. Have `output: 'standalone'` in `next.config.ts`:
    ```typescript
@@ -59,7 +191,52 @@ For optimal deployment, your Next.js project should:
 
 2. Support the package manager you're using (npm, yarn, pnpm, or bun)
 
-## Installation
+## API Endpoints
+
+- `GET /api/projects` - List all projects
+- `POST /api/projects/initialize` - Initialize project structure
+- `POST /api/projects` - Create/finalize a project
+- `GET /api/projects/[id]` - Get project details
+- `DELETE /api/projects/[id]` - Delete a project
+- `POST /api/projects/[id]/deploy` - Deploy a project
+- `POST /api/projects/[id]/restart` - Restart a project
+- `POST /api/projects/[id]/update` - Update from GitHub
+- `GET /api/projects/[id]/logs` - Get container logs
+- `GET /api/projects/[id]/env` - Get environment variables
+- `POST /api/projects/[id]/env` - Save environment variables
+- `GET /api/ports/next` - Get next available port
+
+## Docker Network
+
+The system automatically creates a Docker network (configurable via `DOCKER_NETWORK` env var). All deployed project containers are connected to this network.
+
+## Troubleshooting
+
+### Container can't access Docker socket
+
+Make sure the Docker socket is mounted correctly in `docker-compose.yml`:
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock
+```
+
+### Permission denied errors
+
+The container runs with privileged access to manage Docker. In production, consider:
+- Using a docker group instead of privileged mode
+- Ensuring proper file permissions on PROJECTS_BASE_DIR
+
+### GitHub private repos not working
+
+Make sure you've set `GITHUB_TOKEN` in your `.env` file with a token that has `repo` scope.
+
+### Projects directory not found
+
+Ensure `PROJECTS_BASE_DIR` in `.env` matches the mounted volume path in `docker-compose.yml`.
+
+## Development
+
+For local development (without Docker):
 
 ```bash
 # Install dependencies
@@ -75,48 +252,14 @@ bun run build
 bun run start
 ```
 
-## Usage
-
-1. **Create a Project**: Click "New Project" and follow the 3-step wizard
-   - Step 1: Select GitHub repository and enter project name
-   - Step 2: Configure port (auto-assigned), database, and domain
-   - Step 3: Review and create
-
-2. **Manage Projects**: 
-   - View all projects on the home page
-   - Click "Open Project" to view details
-   - Deploy, restart, update, or delete projects
-
-3. **Environment Variables**:
-   - Go to project details → Environment Variables tab
-   - Add variables and save
-   - Variables are saved to `.env.local` in the project directory
-
-4. **View Logs**:
-   - Go to project details → Logs tab
-   - Click "Refresh" to load container logs
-
-## API Endpoints
-
-- `GET /api/projects` - List all projects
-- `POST /api/projects` - Create a new project
-- `GET /api/projects/[id]` - Get project details
-- `DELETE /api/projects/[id]` - Delete a project
-- `POST /api/projects/[id]/deploy` - Deploy a project
-- `POST /api/projects/[id]/restart` - Restart a project
-- `POST /api/projects/[id]/update` - Update from GitHub
-- `GET /api/projects/[id]/logs` - Get container logs
-- `GET /api/projects/[id]/env` - Get environment variables
-- `POST /api/projects/[id]/env` - Save environment variables
-- `GET /api/ports/next` - Get next available port
-
-## Docker Network
-
-The system automatically creates a Docker network named `deployment-network` (configurable via `DOCKER_NETWORK` env var). All containers are connected to this network.
-
 ## Notes
 
 - This is an MVP - minimal features, no authentication
-- Runs on the VPS where Docker is installed
-- Requires appropriate file system permissions
-- GitHub repositories should be publicly accessible or use SSH keys
+- The deployment manager itself runs in Docker
+- Requires Docker socket access to manage other containers
+- GitHub repositories should be publicly accessible or use GITHUB_TOKEN
+- All projects are deployed as Docker containers
+
+## License
+
+MIT

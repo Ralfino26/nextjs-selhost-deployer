@@ -4,14 +4,6 @@ import { join } from "path";
 import { config } from "@/lib/config";
 import { getProjectStatus } from "@/lib/services/docker.service";
 import { Project } from "@/types/project";
-import { getNextAvailablePort } from "@/lib/services/port.service";
-import {
-  createProjectDirectory,
-  cloneRepository,
-  writeDockerfile,
-  writeDockerCompose,
-  writeDatabaseCompose,
-} from "@/lib/services/filesystem.service";
 import { deployProject, startDatabase } from "@/lib/services/docker.service";
 import { z } from "zod";
 
@@ -86,35 +78,29 @@ export async function GET() {
   }
 }
 
-// POST /api/projects - Create a new project
+// POST /api/projects - Create/finalize a new project (structure should already exist from initialize)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const data = createProjectSchema.parse(body);
 
-    // Create project directory structure
-    const projectDir = await createProjectDirectory(data.projectName);
-
-    // Clone repository
-    const repoUrl = `https://github.com/${data.repo}.git`;
-    await cloneRepository(repoUrl, projectDir);
+    const projectDir = join(config.projectsBaseDir, data.projectName);
+    
+    // Check if project structure already exists (from initialize)
+    const { existsSync } = await import("fs");
+    if (!existsSync(projectDir)) {
+      return NextResponse.json(
+        { error: "Project structure not found. Please initialize the project first." },
+        { status: 400 }
+      );
+    }
 
     // Extract repo name
     const repoName = data.repo.split("/").pop() || "repo";
 
-    // Write Dockerfile if it doesn't exist
-    await writeDockerfile(projectDir, repoName);
-
-    // Write docker-compose.yml
-    await writeDockerCompose(
-      projectDir,
-      data.projectName,
-      repoName,
-      data.port
-    );
-
-    // Write database compose if needed
+    // Write database compose if needed (this is the only thing that might not exist yet)
     if (data.createDatabase) {
+      const { writeDatabaseCompose } = await import("@/lib/services/filesystem.service");
       await writeDatabaseCompose(projectDir, data.projectName);
       await startDatabase(data.projectName);
     }
