@@ -20,14 +20,14 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 
 ## Quick Installation on VPS
 
-Simply clone the repository and run docker compose:
+Download the `docker-compose.yml` file and run it:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Ralfino26/nextjs-selhost-deployer.git
-cd nextjs-selhost-deployer
+# Download docker-compose.yml
+curl -O https://raw.githubusercontent.com/Ralfino26/nextjs-selhost-deployer/main/docker-compose.yml
 
 # Create .env file (optional, defaults work)
+curl -O https://raw.githubusercontent.com/Ralfino26/nextjs-selhost-deployer/main/.env.example
 cp .env.example .env
 
 # Edit .env if needed (optional)
@@ -39,7 +39,7 @@ docker compose up -d
 
 That's it! The deployment manager will be available at `http://localhost:3000` (or your configured port).
 
-**Note:** The first time you run this, Docker will build the image. Subsequent starts will be instant.
+**Note:** The first time you run this, Docker will build the image from the GitHub repository. Subsequent starts will be instant.
 
 ## Configuration
 
