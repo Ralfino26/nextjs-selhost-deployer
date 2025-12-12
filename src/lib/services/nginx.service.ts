@@ -34,6 +34,7 @@ async function getNPMToken(): Promise<string> {
   }
 
   try {
+    console.log(`Attempting to connect to NPM at: ${npmUrl}`);
     const response = await fetch(`${npmUrl}/api/tokens`, {
       method: "POST",
       headers: {
@@ -43,6 +44,8 @@ async function getNPMToken(): Promise<string> {
         identity: npmEmail,
         secret: npmPassword,
       }),
+      // Add timeout
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
@@ -75,6 +78,7 @@ async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
