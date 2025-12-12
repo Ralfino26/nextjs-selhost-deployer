@@ -8,7 +8,7 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 - **GitHub Integration**: Clone and deploy GitHub repositories
 - **Docker Automation**: Automatic Dockerfile and docker-compose.yml generation
 - **Database Support**: Optional PostgreSQL/MongoDB database setup
-- **Port Management**: Manual port selection per project
+- **Port Management**: Automatic port assignment by scanning Docker network
 - **Environment Variables**: Manage project environment variables
 - **Container Management**: Deploy, restart, update, and view logs
 
@@ -53,20 +53,21 @@ PORT=3000
 # This path will be mounted as a volume
 PROJECTS_BASE_DIR=/srv/vps/websites
 
-# Starting port for new projects (default, users choose manually)
+# Starting port for new projects (auto-increments from here)
 STARTING_PORT=5000
 
-# Docker network name for deployed projects
-DOCKER_NETWORK=deployment-network
+# Docker network names for deployed projects
+WEBSITES_NETWORK=websites_network
+INFRA_NETWORK=infra_network
 
 # GitHub API token (optional, required for private repositories)
 # Generate at: https://github.com/settings/tokens
 GITHUB_TOKEN=your_github_token_here
 
-# Database credentials (for projects that use databases)
-DB_USER=postgres
-DB_PASSWORD=your_secure_password_here
-DB_DEFAULT_DATABASE=postgres
+# MongoDB credentials (for projects that use databases)
+MONGO_USER=ralf
+MONGO_PASSWORD=your_secure_password_here
+MONGO_DEFAULT_DATABASE=admin
 ```
 
 ### Important Configuration Options
@@ -79,7 +80,7 @@ DB_DEFAULT_DATABASE=postgres
   - Generate at: https://github.com/settings/tokens
   - Needs `repo` scope for private repos
 
-- **DB_PASSWORD**: Change this to a secure password for database projects
+- **MONGO_PASSWORD**: Change this to a secure password for MongoDB database projects
 
 ## Accessing the Dashboard
 
@@ -98,7 +99,7 @@ After installation, access the dashboard at:
      - Create folder structure
      - Generate Dockerfile
      - Create docker-compose.yml
-     - Assign a port
+     - Automatically assign next available port
 3. **Step 2**: Configure domain and database (optional)
 4. **Step 3**: Review and create
 
@@ -110,7 +111,6 @@ When you create a project, the following structure is automatically generated:
 PROJECTS_BASE_DIR/
 └── project-name/
     ├── repo-name/              # Cloned GitHub repository
-    │   ├── Dockerfile          # Auto-generated if not present
     │   └── Dockerfile          # Auto-generated if not present
     ├── docker/
     │   └── docker-compose.yml   # Auto-generated
@@ -188,11 +188,14 @@ For optimal deployment, your Next.js projects should:
 - `GET /api/projects/[id]/logs` - Get container logs
 - `GET /api/projects/[id]/env` - Get environment variables
 - `POST /api/projects/[id]/env` - Save environment variables
-- `GET /api/ports/next` - Get next available port
 
-## Docker Network
+## Docker Networks
 
-The system automatically creates a Docker network (configurable via `DOCKER_NETWORK` env var). All deployed project containers are connected to this network.
+The system uses two Docker networks:
+- **websites_network**: Local network created by docker-compose (configurable via `WEBSITES_NETWORK`)
+- **infra_network**: External network that should already exist (configurable via `INFRA_NETWORK`)
+
+All deployed project containers are connected to both networks.
 
 ## Troubleshooting
 
@@ -224,16 +227,16 @@ For local development (without Docker):
 
 ```bash
 # Install dependencies
-bun install
+npm install
 
 # Run development server
-bun run dev
+npm run dev
 
 # Build for production
-bun run build
+npm run build
 
 # Start production server
-bun run start
+npm run start
 ```
 
 ## Notes
