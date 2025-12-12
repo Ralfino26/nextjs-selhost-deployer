@@ -111,7 +111,7 @@ PROJECTS_BASE_DIR/
 └── project-name/
     ├── repo-name/              # Cloned GitHub repository
     │   ├── Dockerfile          # Auto-generated if not present
-    │   └── .env.local           # Environment variables
+    │   └── Dockerfile          # Auto-generated if not present
     ├── docker/
     │   └── docker-compose.yml   # Auto-generated
     └── database/                # Only if database is enabled
@@ -131,7 +131,8 @@ PROJECTS_BASE_DIR/
 
 - Go to project details → **Environment Variables** tab
 - Add variables and click **Save**
-- Variables are saved to `.env.local` in the project directory
+- Variables are stored directly in `docker-compose.yml` (no separate .env files)
+- Container automatically restarts with new variables
 
 ### 5. View Logs
 
