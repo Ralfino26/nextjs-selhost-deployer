@@ -4,12 +4,14 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 
 ## Features
 
+- **Secure Web Interface**: Basic authentication with username/password
 - **Project Management**: Create, view, and delete projects
 - **GitHub Integration**: Clone and deploy GitHub repositories
 - **Docker Automation**: Automatic Dockerfile and docker-compose.yml generation
-- **Database Support**: Optional PostgreSQL/MongoDB database setup
+- **Database Support**: Optional MongoDB database setup
 - **Port Management**: Automatic port assignment by scanning Docker network
 - **Environment Variables**: Manage project environment variables
+- **Settings Management**: Configure API keys and deployment settings via web UI
 - **Container Management**: Deploy, restart, update, and view logs
 
 ## Requirements
@@ -64,6 +66,10 @@ INFRA_NETWORK=infra_network
 # Generate at: https://github.com/settings/tokens
 GITHUB_TOKEN=your_github_token_here
 
+# Web interface authentication
+WEB_USERNAME=ralf
+WEB_PASSWORD=supersecret
+
 # MongoDB credentials (for projects that use databases)
 MONGO_USER=ralf
 MONGO_PASSWORD=your_secure_password_here
@@ -82,11 +88,17 @@ MONGO_DEFAULT_DATABASE=admin
 
 - **MONGO_PASSWORD**: Change this to a secure password for MongoDB database projects
 
+- **WEB_USERNAME** / **WEB_PASSWORD**: Credentials for accessing the web interface
+  - Default: `ralf` / `supersecret`
+  - **IMPORTANT**: Change these to secure values in production!
+
 ## Accessing the Dashboard
 
 After installation, access the dashboard at:
 - **Local**: http://localhost:3000
 - **VPS**: http://your-vps-ip:3000
+
+**Login Required**: You'll be redirected to the login page. Use the credentials from `WEB_USERNAME` and `WEB_PASSWORD` in your `.env` file.
 
 ## Usage
 
@@ -139,6 +151,12 @@ PROJECTS_BASE_DIR/
 - Go to project details → **Logs** tab
 - Click **Refresh** to load container logs
 
+### 6. Settings
+
+- Click **Settings** in the header to access configuration
+- Configure GitHub token, MongoDB credentials, and deployment settings
+- Settings are saved to `data/config.json` (persisted via volume mount)
+
 ## Docker Commands
 
 ```bash
@@ -188,6 +206,9 @@ For optimal deployment, your Next.js projects should:
 - `GET /api/projects/[id]/logs` - Get container logs
 - `GET /api/projects/[id]/env` - Get environment variables
 - `POST /api/projects/[id]/env` - Save environment variables
+- `GET /api/settings` - Get current settings
+- `POST /api/settings` - Save settings
+- `POST /api/auth/check` - Verify authentication credentials
 
 ## Docker Networks
 
@@ -239,9 +260,20 @@ npm run build
 npm run start
 ```
 
+## Security Notes
+
+- **Authentication**: The web interface is protected with basic authentication
+  - Default credentials: `ralf` / `supersecret`
+  - **Change these immediately in production!**
+  - Set `WEB_USERNAME` and `WEB_PASSWORD` in your `.env` file
+- **API Protection**: All API endpoints require authentication
+- **Docker Access**: Container runs with privileged access to manage Docker
+  - Consider using docker group instead of privileged mode in production
+- **GitHub Token**: Store securely in `.env` file (not committed to git)
+
 ## Notes
 
-- This is an MVP - minimal features, no authentication
+- This is an MVP with minimal features
 - The deployment manager itself runs in Docker
 - Requires Docker socket access to manage other containers
 - GitHub repositories should be publicly accessible or use GITHUB_TOKEN

@@ -36,7 +36,10 @@ export default function ProjectDetailPage() {
 
   const fetchProject = async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`);
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}`, {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
       if (response.ok) {
         const data = await response.json();
         setProject(data);
@@ -50,7 +53,10 @@ export default function ProjectDetailPage() {
 
   const fetchLogs = async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/logs?lines=100`);
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/logs?lines=100`, {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
       if (response.ok) {
         const data = await response.json();
         setLogs(data.logs);
@@ -62,7 +68,10 @@ export default function ProjectDetailPage() {
 
   const fetchEnvVars = async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/env`);
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/env`, {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
       if (response.ok) {
         const data = await response.json();
         setEnvVariables(data.variables || []);
@@ -75,8 +84,10 @@ export default function ProjectDetailPage() {
   const handleDeploy = async () => {
     setActionLoading("deploy");
     try {
+      const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/deploy`, {
         method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
         await fetchProject();
@@ -91,8 +102,10 @@ export default function ProjectDetailPage() {
   const handleUpdate = async () => {
     setActionLoading("update");
     try {
+      const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/update`, {
         method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
         await fetchProject();
@@ -107,8 +120,10 @@ export default function ProjectDetailPage() {
   const handleRestart = async () => {
     setActionLoading("restart");
     try {
+      const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/restart`, {
         method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
         await fetchProject();
@@ -127,8 +142,10 @@ export default function ProjectDetailPage() {
 
     setActionLoading("delete");
     try {
+      const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "DELETE",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
         router.push("/");
@@ -150,10 +167,12 @@ export default function ProjectDetailPage() {
 
   const handleSave = async () => {
     try {
+      const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/env`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(auth ? { Authorization: `Basic ${auth}` } : {}),
         },
         body: JSON.stringify({ variables: envVariables }),
       });

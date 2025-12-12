@@ -43,10 +43,12 @@ export default function NewProjectPage() {
         setLoading(true);
         try {
           // Initialize project structure: clone repo, create Dockerfile
+          const auth = sessionStorage.getItem("auth");
           const response = await fetch("/api/projects/initialize", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              ...(auth ? { Authorization: `Basic ${auth}` } : {}),
             },
             body: JSON.stringify({
               repo: formData.repo,
@@ -84,10 +86,12 @@ export default function NewProjectPage() {
   const handleCreate = async () => {
     setLoading(true);
     try {
+      const auth = sessionStorage.getItem("auth");
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(auth ? { Authorization: `Basic ${auth}` } : {}),
         },
         body: JSON.stringify({
           repo: formData.repo,

@@ -23,7 +23,10 @@ export default function Home() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch("/api/projects");
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch("/api/projects", {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
       const data = await response.json();
       setProjects(data);
     } catch (error) {

@@ -16,6 +16,9 @@ services:
       # Docker network names
       - WEBSITES_NETWORK=${WEBSITES_NETWORK:-websites_network}
       - INFRA_NETWORK=${INFRA_NETWORK:-infra_network}
+      # Web interface authentication
+      - WEB_USERNAME=${WEB_USERNAME:-ralf}
+      - WEB_PASSWORD=${WEB_PASSWORD:-supersecret}
       # GitHub API token (optional, for private repos)
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       # MongoDB credentials
