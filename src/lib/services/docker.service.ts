@@ -30,11 +30,11 @@ export async function deployProject(projectName: string): Promise<void> {
 // Start database if it exists
 export async function startDatabase(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
-  const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
+  const databaseDir = join(projectDir, "database");
 
   try {
-    await execAsync(`docker compose -f ${databaseComposePath} up -d`, {
-      cwd: join(projectDir, "database"),
+    await execAsync(`docker compose up -d`, {
+      cwd: databaseDir,
     });
   } catch (error) {
     // Database compose file might not exist
@@ -45,33 +45,33 @@ export async function startDatabase(projectName: string): Promise<void> {
 // Restart a project
 export async function restartProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
-  const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+  const dockerComposeDir = join(projectDir, "docker");
 
-  await execAsync(`docker compose -f ${dockerComposePath} restart`, {
-    cwd: join(projectDir, "docker"),
+  await execAsync(`docker compose restart`, {
+    cwd: dockerComposeDir,
   });
 }
 
 // Stop a project
 export async function stopProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
-  const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+  const dockerComposeDir = join(projectDir, "docker");
 
-  await execAsync(`docker compose -f ${dockerComposePath} stop`, {
-    cwd: join(projectDir, "docker"),
+  await execAsync(`docker compose stop`, {
+    cwd: dockerComposeDir,
   });
 }
 
 // Delete a project (stop and remove containers)
 export async function deleteProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
-  const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
-  const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
+  const dockerComposeDir = join(projectDir, "docker");
+  const databaseDir = join(projectDir, "database");
 
   // Stop and remove main service
   try {
-    await execAsync(`docker compose -f ${dockerComposePath} down -v`, {
-      cwd: join(projectDir, "docker"),
+    await execAsync(`docker compose down -v`, {
+      cwd: dockerComposeDir,
     });
   } catch (error) {
     console.error(`Failed to remove main service:`, error);
@@ -79,8 +79,8 @@ export async function deleteProject(projectName: string): Promise<void> {
 
   // Stop and remove database if exists
   try {
-    await execAsync(`docker compose -f ${databaseComposePath} down -v`, {
-      cwd: join(projectDir, "database"),
+    await execAsync(`docker compose down -v`, {
+      cwd: databaseDir,
     });
   } catch (error) {
     // Database might not exist, ignore
