@@ -32,53 +32,65 @@ export async function POST(
 
     const repoPath = join(projectDir, repoDir.name);
 
-    // Use gh repo sync as per your workflow
+    // Always use GitHub token if available
+    if (!config.githubToken) {
+      return NextResponse.json(
+        { error: "GitHub token not configured. Please set it in Settings." },
+        { status: 400 }
+      );
+    }
+
+    // Use gh repo sync as per your workflow (with token)
     try {
-      const env = config.githubToken ? { ...process.env, GITHUB_TOKEN: config.githubToken } : process.env;
-      await execAsync("gh repo sync", { cwd: repoPath, env });
+      const env = { ...process.env, GITHUB_TOKEN: config.githubToken };
+      await execAsync("gh repo sync", { cwd: repoPath, env, shell: "/bin/sh" });
     } catch (error) {
       // Fall back to git pull if gh CLI not available
-      console.warn("GitHub CLI not available, falling back to git pull");
+      console.warn("GitHub CLI not available, falling back to git pull with token");
       
-      // For git pull with private repos, configure git to use token
-      if (config.githubToken) {
-        try {
-          // Get current remote URL
-          const remoteResult = await execAsync("git config --get remote.origin.url", { 
+      try {
+        // Get current remote URL
+        const remoteResult = await execAsync("git config --get remote.origin.url", { 
+          cwd: repoPath,
+          shell: "/bin/sh"
+        });
+        const remoteUrl = remoteResult.stdout.trim();
+        
+        // If it's a GitHub URL, update remote with token
+        if (remoteUrl.includes("github.com")) {
+          // Extract repo path from URL (handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git)
+          let repoPathFromUrl = remoteUrl;
+          if (repoPathFromUrl.startsWith("git@")) {
+            repoPathFromUrl = repoPathFromUrl.replace("git@github.com:", "").replace(".git", "");
+          } else {
+            repoPathFromUrl = repoPathFromUrl.replace("https://github.com/", "").replace(".git", "");
+            // Remove token if already present
+            repoPathFromUrl = repoPathFromUrl.replace(/^[^@]+@/, "");
+          }
+          
+          // Update remote URL with token
+          const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
+          await execAsync(`git remote set-url origin "${newUrl}"`, { 
             cwd: repoPath,
             shell: "/bin/sh"
           });
-          const remoteUrl = remoteResult.stdout.trim();
           
-          // If it's a GitHub URL, update remote with token
-          if (remoteUrl.includes("github.com")) {
-            // Extract repo path from URL (handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git)
-            let repoPathFromUrl = remoteUrl;
-            if (repoPathFromUrl.startsWith("git@")) {
-              repoPathFromUrl = repoPathFromUrl.replace("git@github.com:", "").replace(".git", "");
-            } else {
-              repoPathFromUrl = repoPathFromUrl.replace("https://github.com/", "").replace(".git", "");
-              // Remove token if already present
-              repoPathFromUrl = repoPathFromUrl.replace(/^[^@]+@/, "");
-            }
-            
-            // Update remote URL with token (using git config to avoid shell issues)
-            const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
-            await execAsync(`git remote set-url origin "${newUrl}"`, { 
-              cwd: repoPath,
-              shell: "/bin/sh"
-            });
-          }
-        } catch (configError) {
-          console.warn("Failed to configure git remote with token:", configError);
+          // Now pull with the updated remote
+          await execAsync("git pull", { 
+            cwd: repoPath,
+            shell: "/bin/sh"
+          });
+        } else {
+          // Not a GitHub URL, just pull normally
+          await execAsync("git pull", { 
+            cwd: repoPath,
+            shell: "/bin/sh"
+          });
         }
+      } catch (gitError: any) {
+        console.error("Git pull failed:", gitError);
+        throw new Error(`Failed to update repository: ${gitError.message}`);
       }
-      
-      // Now pull normally (remote is already configured with token if needed)
-      await execAsync("git pull", { 
-        cwd: repoPath,
-        shell: "/bin/sh"
-      });
     }
 
     // Rebuild and redeploy
