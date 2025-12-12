@@ -11,7 +11,7 @@ COPY package.json bun.lock* ./
 
 # Install dependencies
 RUN if [ -f bun.lock ]; then \
-      apk add --no-cache curl unzip && \
+      apk add --no-cache curl unzip bash && \
       curl -fsSL https://bun.sh/install | bash && \
       /root/.bun/bin/bun install --frozen-lockfile; \
     else \
