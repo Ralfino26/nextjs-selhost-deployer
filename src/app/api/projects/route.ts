@@ -65,18 +65,16 @@ export async function GET() {
           
           // Read domain from metadata.json (required)
           const metadataPath = join(baseDir, dir.name, "metadata.json");
-          let domain: string;
+          let domain: string | null = null;
           try {
             const metadataContent = await readFile(metadataPath, "utf-8");
             const metadata = JSON.parse(metadataContent);
-            if (!metadata.domain) {
-              throw new Error("Domain not found in metadata.json");
+            if (metadata.domain) {
+              domain = metadata.domain;
             }
-            domain = metadata.domain;
           } catch (error) {
-            // Skip projects without valid metadata.json
-            console.warn(`Skipping project ${dir.name}: ${error}`);
-            continue;
+            // metadata.json doesn't exist or is invalid - will show error in UI
+            console.warn(`No metadata.json for project ${dir.name}: ${error}`);
           }
 
           const hasDatabase = projectSubDirs.some(
@@ -88,9 +86,9 @@ export async function GET() {
             name: dir.name,
             repo: repoDir.name,
             port,
-            domain,
+            domain: domain || "ERROR: metadata.json missing",
             createDatabase: hasDatabase,
-            status,
+            status: domain ? status : "Error",
             directory: join(baseDir, dir.name),
           });
         } catch {
