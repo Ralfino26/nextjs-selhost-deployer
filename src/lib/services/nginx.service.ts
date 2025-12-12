@@ -82,7 +82,7 @@ async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
     }
 
     const data = await response.json();
-    npmProxyHosts = data.filter((host: NPMProxyHost) => host.enabled);
+    npmProxyHosts = data.filter((host: NPMProxyHost) => host.enabled) as NPMProxyHost[];
     return npmProxyHosts;
   } catch (error: any) {
     throw new Error(`Failed to get NPM proxy hosts: ${error?.message || error}`);
