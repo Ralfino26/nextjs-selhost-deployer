@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAuthenticated } from "./lib/auth";
 
+export const runtime = "nodejs"; // Use Node.js runtime instead of Edge
+
 export function middleware(request: NextRequest) {
   // Skip auth for login page and auth API
   if (

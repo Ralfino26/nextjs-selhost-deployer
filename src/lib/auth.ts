@@ -1,12 +1,14 @@
-import { webAuth } from "./config";
-
 // Simple authentication check
+// Note: webAuth is read directly from env to avoid importing config.ts in middleware
 export function checkAuth(username: string, password: string): boolean {
   if (!username || !password) {
     return false;
   }
   
-  return username === webAuth.username && password === webAuth.password;
+  const validUsername = process.env.WEB_USERNAME || "ralf";
+  const validPassword = process.env.WEB_PASSWORD || "supersecret";
+  
+  return username === validUsername && password === validPassword;
 }
 
 export function isAuthenticated(request: Request): boolean {
