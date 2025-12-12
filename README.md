@@ -24,7 +24,7 @@ A minimal MVP dashboard for automating deployments of GitHub Next.js projects to
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nextjs-selhost-deployer.git
+git clone https://github.com/Ralfino26/nextjs-selhost-deployer.git
 cd nextjs-selhost-deployer
 
 # Run the installation script
@@ -41,7 +41,7 @@ The script will:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nextjs-selhost-deployer.git
+git clone https://github.com/Ralfino26/nextjs-selhost-deployer.git
 cd nextjs-selhost-deployer
 
 # Create .env file
