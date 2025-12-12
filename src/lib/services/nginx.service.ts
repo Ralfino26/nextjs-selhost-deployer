@@ -105,7 +105,8 @@ export async function getDomainForProject(
     const matchingHost = hosts.find((host) => {
       // Match by port first
       if (host.forward_port === port) {
-        const forwardHost = host.forward_host.toLowerCase();
+        // Remove http:// or https:// prefix if present
+        let forwardHost = host.forward_host.toLowerCase().replace(/^https?:\/\//, '');
         console.log(`Checking host: ${host.domain_names[0]} -> ${forwardHost}:${host.forward_port}`);
         
         // Check if forward_host matches localhost, 127.0.0.1, or container name
@@ -113,9 +114,7 @@ export async function getDomainForProject(
           forwardHost === "localhost" ||
           forwardHost === "127.0.0.1" ||
           forwardHost === projectName.toLowerCase() ||
-          forwardHost.includes(projectName.toLowerCase()) ||
-          forwardHost === `http://localhost` ||
-          forwardHost === `http://127.0.0.1`
+          forwardHost.includes(projectName.toLowerCase())
         );
         
         if (matches) {
