@@ -95,6 +95,18 @@ export const config = {
       defaultDatabase: c.mongoDefaultDatabase,
     };
   },
+  
+  get npmUrl(): string {
+    return loadConfig().npmUrl || process.env.NPM_URL || "http://nginx-proxy-manager:81";
+  },
+  
+  get npmEmail(): string {
+    return loadConfig().npmEmail || process.env.NPM_EMAIL || "";
+  },
+  
+  get npmPassword(): string {
+    return loadConfig().npmPassword || process.env.NPM_PASSWORD || "";
+  },
 };
 
 // Web interface credentials - ONLY from environment variables
