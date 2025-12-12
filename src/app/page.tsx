@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,30 +11,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-// Placeholder data
-const projects = [
-  {
-    id: "1",
-    name: "my-nextjs-app",
-    status: "Running",
-    lastDeployment: "2024-01-15 10:30 AM",
-  },
-  {
-    id: "2",
-    name: "api-service",
-    status: "Stopped",
-    lastDeployment: "2024-01-14 3:45 PM",
-  },
-  {
-    id: "3",
-    name: "dashboard",
-    status: "Running",
-    lastDeployment: "2024-01-15 9:15 AM",
-  },
-];
+import { Project } from "@/types/project";
 
 export default function Home() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      const data = await response.json();
+      setProjects(data);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <p className="text-gray-700">Loading projects...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
@@ -47,35 +56,47 @@ export default function Home() {
             <TableRow>
               <TableHead>Project Name</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last Deployment</TableHead>
+              <TableHead>Port</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {projects.map((project) => (
-              <TableRow key={project.id}>
-                <TableCell className="font-medium">{project.name}</TableCell>
-                <TableCell>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      project.status === "Running"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {project.status}
-                  </span>
-                </TableCell>
-                <TableCell>{project.lastDeployment}</TableCell>
-                <TableCell className="text-right">
-                  <Link href={`/projects/${project.id}`}>
-                    <Button variant="outline" size="sm">
-                      Open Project
-                    </Button>
-                  </Link>
+            {projects.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-gray-700">
+                  No projects yet. Create your first project to get started.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              projects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell className="font-medium">{project.name}</TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                        project.status === "Running"
+                          ? "bg-green-100 text-green-800"
+                          : project.status === "Building"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : project.status === "Error"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {project.status}
+                    </span>
+                  </TableCell>
+                  <TableCell>{project.port}</TableCell>
+                  <TableCell className="text-right">
+                    <Link href={`/projects/${project.id}`}>
+                      <Button variant="outline" size="sm">
+                        Open Project
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

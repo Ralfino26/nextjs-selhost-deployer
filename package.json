@@ -16,14 +16,18 @@
     "@radix-ui/react-tabs": "^1.1.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "dockerode": "^4.0.2",
     "lucide-react": "^0.468.0",
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1",
-    "tailwind-merge": "^2.5.5"
+    "simple-git": "^3.25.0",
+    "tailwind-merge": "^2.5.5",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/dockerode": "^3.3.47",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

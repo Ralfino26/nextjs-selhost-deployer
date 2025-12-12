@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-// Placeholder repos
+// Placeholder repos - in production this would come from GitHub API
 const repos = [
   "ralf/my-nextjs-app",
   "ralf/api-service",
@@ -25,13 +25,32 @@ const repos = [
 export default function NewProjectPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     repo: "",
     projectName: "",
-    port: "3000",
+    port: "",
     createDatabase: false,
     domain: "",
   });
+
+  // Fetch next available port when entering step 2
+  useEffect(() => {
+    if (step === 2 && !formData.port) {
+      fetchNextPort();
+    }
+  }, [step]);
+
+  const fetchNextPort = async () => {
+    try {
+      const response = await fetch("/api/ports/next");
+      const data = await response.json();
+      setFormData({ ...formData, port: data.port.toString() });
+    } catch (error) {
+      console.error("Error fetching next port:", error);
+      setFormData({ ...formData, port: "3000" });
+    }
+  };
 
   const handleContinue = () => {
     if (step === 1) {
@@ -45,9 +64,36 @@ export default function NewProjectPage() {
     }
   };
 
-  const handleCreate = () => {
-    // Placeholder: create project
-    router.push("/");
+  const handleCreate = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          repo: formData.repo,
+          projectName: formData.projectName,
+          port: parseInt(formData.port, 10),
+          domain: formData.domain,
+          createDatabase: formData.createDatabase,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(`Error creating project: ${error.error || "Unknown error"}`);
+        return;
+      }
+
+      router.push("/");
+    } catch (error) {
+      console.error("Error creating project:", error);
+      alert("Failed to create project");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -192,7 +238,9 @@ export default function NewProjectPage() {
               <Button variant="outline" onClick={() => setStep(2)}>
                 Back
               </Button>
-              <Button onClick={handleCreate}>Create Project</Button>
+              <Button onClick={handleCreate} disabled={loading}>
+                {loading ? "Creating..." : "Create Project"}
+              </Button>
             </div>
           </div>
         )}
