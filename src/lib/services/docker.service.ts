@@ -11,31 +11,18 @@ async function getDocker() {
   return new Docker();
 }
 
-// Helper to get the correct docker compose command
-async function getDockerComposeCommand(): Promise<string> {
-  try {
-    // Try docker-compose (with dash) first
-    await execAsync("docker-compose --version");
-    return "docker-compose";
-  } catch {
-    // Fall back to docker compose (without dash)
-    return "docker compose";
-  }
-}
-
 // Build and start a project using docker-compose
 // Networks (websites_network and infra_network) should already exist or be created by compose
 export async function deployProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposeDir = join(projectDir, "docker");
-  const composeCmd = await getDockerComposeCommand();
 
   // Run docker compose build and up -d (as per your workflow)
-  await execAsync(`${composeCmd} build`, {
+  await execAsync(`docker compose build`, {
     cwd: dockerComposeDir,
   });
   
-  await execAsync(`${composeCmd} up -d`, {
+  await execAsync(`docker compose up -d`, {
     cwd: dockerComposeDir,
   });
 }
@@ -44,10 +31,9 @@ export async function deployProject(projectName: string): Promise<void> {
 export async function startDatabase(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const databaseDir = join(projectDir, "database");
-  const composeCmd = await getDockerComposeCommand();
 
   try {
-    await execAsync(`${composeCmd} up -d`, {
+    await execAsync(`docker compose up -d`, {
       cwd: databaseDir,
     });
   } catch (error) {
@@ -60,9 +46,8 @@ export async function startDatabase(projectName: string): Promise<void> {
 export async function restartProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposeDir = join(projectDir, "docker");
-  const composeCmd = await getDockerComposeCommand();
 
-  await execAsync(`${composeCmd} restart`, {
+  await execAsync(`docker compose restart`, {
     cwd: dockerComposeDir,
   });
 }
@@ -71,9 +56,8 @@ export async function restartProject(projectName: string): Promise<void> {
 export async function stopProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposeDir = join(projectDir, "docker");
-  const composeCmd = await getDockerComposeCommand();
 
-  await execAsync(`${composeCmd} stop`, {
+  await execAsync(`docker compose stop`, {
     cwd: dockerComposeDir,
   });
 }
@@ -83,11 +67,10 @@ export async function deleteProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposeDir = join(projectDir, "docker");
   const databaseDir = join(projectDir, "database");
-  const composeCmd = await getDockerComposeCommand();
 
   // Stop and remove main service
   try {
-    await execAsync(`${composeCmd} down -v`, {
+    await execAsync(`docker compose down -v`, {
       cwd: dockerComposeDir,
     });
   } catch (error) {
@@ -96,7 +79,7 @@ export async function deleteProject(projectName: string): Promise<void> {
 
   // Stop and remove database if exists
   try {
-    await execAsync(`${composeCmd} down -v`, {
+    await execAsync(`docker compose down -v`, {
       cwd: databaseDir,
     });
   } catch (error) {
@@ -137,9 +120,8 @@ export async function getLogs(
       const { promisify } = await import("util");
       const execAsync = promisify(exec);
       
-      const composeCmd = await getDockerComposeCommand();
       const result = await execAsync(
-        `${composeCmd} logs --tail=${lines}`,
+        `docker compose logs --tail=${lines}`,
         { cwd: dockerComposeDir }
       );
       
