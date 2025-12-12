@@ -7,16 +7,10 @@ RUN apk add --no-cache libc6-compat git
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lock* ./
+COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN if [ -f bun.lock ]; then \
-      apk add --no-cache curl unzip bash && \
-      curl -fsSL https://bun.sh/install | bash && \
-      /root/.bun/bin/bun install --frozen-lockfile; \
-    else \
-      npm ci; \
-    fi
+# Install dependencies with npm (standard in Node.js images)
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -28,16 +22,8 @@ COPY . .
 # Next.js collects completely anonymous telemetry data about general usage.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install bun and build Next.js in one step (bun needs to be in same RUN command)
-RUN if [ -f bun.lock ]; then \
-      apk add --no-cache curl unzip bash && \
-      curl -fsSL https://bun.sh/install | bash && \
-      export BUN_INSTALL="/root/.bun" && \
-      export PATH="$BUN_INSTALL/bin:$PATH" && \
-      bun run build; \
-    else \
-      npm run build; \
-    fi
+# Build Next.js with npm
+RUN npm run build
 
 # Production image
 FROM base AS runner
