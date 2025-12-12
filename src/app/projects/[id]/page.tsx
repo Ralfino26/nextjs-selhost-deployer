@@ -300,18 +300,25 @@ export default function ProjectDetailPage() {
         </TabsContent>
         <TabsContent value="env" className="mt-4">
           <div className="rounded-md border border-gray-200 bg-white p-6">
+            <div className="mb-4 flex justify-between items-center">
+              <h3 className="font-medium">Environment Variables</h3>
+              <Button variant="outline" size="sm" onClick={fetchEnvVars}>
+                Refresh
+              </Button>
+            </div>
             <div className="mb-4">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Key</TableHead>
                     <TableHead>Value</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {envVariables.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center text-gray-700">
+                      <TableCell colSpan={3} className="text-center text-gray-700">
                         No environment variables set
                       </TableCell>
                     </TableRow>
@@ -319,7 +326,18 @@ export default function ProjectDetailPage() {
                     envVariables.map((env, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{env.key}</TableCell>
-                        <TableCell>{env.value}</TableCell>
+                        <TableCell className="font-mono text-sm">{env.value}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEnvVariables(envVariables.filter((_, i) => i !== index));
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}

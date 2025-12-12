@@ -38,12 +38,41 @@ export async function GET(
       );
     }
 
-    // Read environment variables from docker-compose.yml
-    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+    const variables: EnvironmentVariable[] = [];
+    const repoPath = join(projectDir, repoDir.name);
+    
+    // First, try to read from .env files in the repo (official source)
+    const envFiles = [".env.local", ".env", ".env.production", ".env.example"];
+    for (const envFile of envFiles) {
+      const envFilePath = join(repoPath, envFile);
+      try {
+        const envContent = await readFile(envFilePath, "utf-8");
+        const envLines = envContent.split("\n");
+        for (const line of envLines) {
+          // Skip comments and empty lines
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith("#")) continue;
+          
+          // Parse KEY=VALUE format
+          const match = trimmedLine.match(/^([^=]+)=(.*)$/);
+          if (match) {
+            const key = match[1].trim();
+            const value = match[2].trim().replace(/^["']|["']$/g, ""); // Remove quotes
+            // Don't add duplicates
+            if (!variables.find(v => v.key === key)) {
+              variables.push({ key, value });
+            }
+          }
+        }
+      } catch {
+        // File doesn't exist, continue to next
+      }
+    }
 
+    // Also read from docker-compose.yml (deployed values)
+    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
     try {
       const content = await readFile(dockerComposePath, "utf-8");
-      const variables: EnvironmentVariable[] = [];
       
       // Parse environment section from docker-compose.yml
       const envMatch = content.match(/environment:\s*\n((?:\s+[^:\n]+:[^\n]+\n?)+)/);
@@ -56,17 +85,22 @@ export async function GET(
             const value = match[2].trim();
             // Skip NODE_ENV as it's always there
             if (key !== "NODE_ENV") {
-              variables.push({ key, value });
+              // Update existing or add new
+              const existing = variables.find(v => v.key === key);
+              if (existing) {
+                existing.value = value; // docker-compose.yml takes precedence
+              } else {
+                variables.push({ key, value });
+              }
             }
           }
         }
       }
-
-      return NextResponse.json({ variables });
     } catch {
-      // docker-compose.yml doesn't exist or can't be read, return empty
-      return NextResponse.json({ variables: [] });
+      // docker-compose.yml doesn't exist or can't be read
     }
+
+    return NextResponse.json({ variables });
   } catch (error) {
     console.error("Error fetching environment variables:", error);
     return NextResponse.json(
