@@ -25,17 +25,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Install bun if needed (for building) - check after copying files
-RUN if [ -f bun.lock ]; then \
-      apk add --no-cache curl unzip bash && \
-      curl -fsSL https://bun.sh/install | bash; \
-    fi
-
 # Next.js collects completely anonymous telemetry data about general usage.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build Next.js
+# Install bun and build Next.js in one step (bun needs to be in same RUN command)
 RUN if [ -f bun.lock ]; then \
+      apk add --no-cache curl unzip bash && \
+      curl -fsSL https://bun.sh/install | bash && \
       /root/.bun/bin/bun run build; \
     else \
       npm run build; \
