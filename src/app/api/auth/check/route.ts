@@ -20,9 +20,13 @@ export async function POST(request: NextRequest) {
       
       // Set HTTP-only cookie for authentication
       const credentials = Buffer.from(`${username}:${password}`).toString("base64");
+      
+      // Only use secure flag if we're actually on HTTPS
+      const isSecure = request.url.startsWith("https://");
+      
       response.cookies.set("auth", credentials, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isSecure,
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 7, // 7 days
       });
