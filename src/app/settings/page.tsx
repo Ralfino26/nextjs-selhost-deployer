@@ -163,6 +163,56 @@ export default function SettingsPage() {
         </div>
 
         <div className="border-t border-gray-200 pt-6">
+          <h2 className="mb-4 text-lg font-medium">Nginx Proxy Manager Configuration</h2>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="npmUrl">NPM URL</Label>
+              <Input
+                id="npmUrl"
+                value={config.npmUrl || "http://nginx-proxy-manager:81"}
+                onChange={(e) =>
+                  setConfig({ ...config, npmUrl: e.target.value })
+                }
+                placeholder="http://nginx-proxy-manager:81"
+              />
+              <p className="mt-1 text-xs text-gray-700">
+                URL to access Nginx Proxy Manager API (usually http://nginx-proxy-manager:81 or http://localhost:81)
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="npmEmail">NPM Email</Label>
+              <Input
+                id="npmEmail"
+                type="email"
+                value={config.npmEmail || ""}
+                onChange={(e) =>
+                  setConfig({ ...config, npmEmail: e.target.value })
+                }
+                placeholder="admin@example.com"
+              />
+              <p className="mt-1 text-xs text-gray-700">
+                Email address used to login to Nginx Proxy Manager
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="npmPassword">NPM Password</Label>
+              <Input
+                id="npmPassword"
+                type="password"
+                value={config.npmPassword || ""}
+                onChange={(e) =>
+                  setConfig({ ...config, npmPassword: e.target.value })
+                }
+                placeholder="Your NPM password"
+              />
+              <p className="mt-1 text-xs text-gray-700">
+                Password for Nginx Proxy Manager login
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-6">
           <h2 className="mb-4 text-lg font-medium">Deployment Configuration</h2>
           <div className="space-y-4">
             <div>
