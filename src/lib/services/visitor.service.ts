@@ -48,51 +48,92 @@ export async function getActiveConnections(projectName: string, port: number): P
     }
 
     // Count connections in multiple ways:
-    // 1. Connections to container IP on internal port (3000)
-    // 2. Connections to exposed port on localhost
-    // 3. Connections via container name (Docker DNS)
+    // 1. Use Docker exec to check connections inside the container
+    // 2. Connections to container IP on internal port (3000)
+    // 3. Connections to exposed port on localhost
+    // 4. Connections via container name (Docker DNS)
     
     let totalConnections = 0;
 
+    // Method 1: Check connections inside the container (most accurate)
     try {
-      // Method 1: Count connections to container IP:internalPort
-      const result1 = await execAsync(
-        `ss -tn state established | grep "${containerIP}:${internalPort}" | wc -l`,
-        { shell: "/bin/sh" }
-      );
-      totalConnections += parseInt(result1.stdout.trim(), 10) || 0;
-    } catch (error) {
-      // Ignore
-    }
-
-    try {
-      // Method 2: Count connections to exposed port (localhost:port)
-      const result2 = await execAsync(
-        `ss -tn state established | grep ":${port} " | wc -l`,
-        { shell: "/bin/sh" }
-      );
-      const exposedConnections = parseInt(result2.stdout.trim(), 10) || 0;
-      // Only add if it's higher (to avoid double counting)
-      if (exposedConnections > totalConnections) {
-        totalConnections = exposedConnections;
+      const execResult = await new Promise<string>((resolve, reject) => {
+        container.exec(
+          {
+            Cmd: ["sh", "-c", `ss -tn state established | grep ":${internalPort}" | wc -l || netstat -tn | grep ESTABLISHED | grep ":${internalPort}" | wc -l || echo "0"`],
+            AttachStdout: true,
+            AttachStderr: true,
+          },
+          (err, exec) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            
+            exec?.start({}, (err, stream) => {
+              if (err) {
+                reject(err);
+                return;
+              }
+              
+              let output = "";
+              stream?.on("data", (chunk: Buffer) => {
+                output += chunk.toString();
+              });
+              
+              stream?.on("end", () => {
+                resolve(output.trim());
+              });
+            });
+          }
+        );
+      });
+      
+      const containerConnections = parseInt(execResult, 10) || 0;
+      if (containerConnections > 0) {
+        totalConnections = containerConnections;
       }
     } catch (error) {
-      // Ignore
+      // Container exec failed, try other methods
     }
 
-    try {
-      // Method 3: Count connections via container name (Docker network DNS)
-      // This is useful when NPM forwards to container name
-      const result3 = await execAsync(
-        `ss -tn state established | grep -E "${projectName}:${internalPort}|${projectName.toLowerCase()}:${internalPort}" | wc -l`,
-        { shell: "/bin/sh" }
-      );
-      const nameConnections = parseInt(result3.stdout.trim(), 10) || 0;
-      if (nameConnections > totalConnections) {
-        totalConnections = nameConnections;
+    // Method 2: Count connections to container IP:internalPort (if Method 1 failed)
+    if (totalConnections === 0) {
+      try {
+        const result1 = await execAsync(
+          `ss -tn state established | grep "${containerIP}:${internalPort}" | wc -l`,
+          { shell: "/bin/sh" }
+        );
+        totalConnections = parseInt(result1.stdout.trim(), 10) || 0;
+      } catch (error) {
+        // Ignore
       }
-    } catch (error) {
-      // Ignore
+    }
+
+    // Method 3: Count connections to exposed port (localhost:port)
+    if (totalConnections === 0) {
+      try {
+        const result2 = await execAsync(
+          `ss -tn state established | grep ":${port} " | wc -l`,
+          { shell: "/bin/sh" }
+        );
+        totalConnections = parseInt(result2.stdout.trim(), 10) || 0;
+      } catch (error) {
+        // Ignore
+      }
+    }
+
+    // Method 4: Count connections via container name (Docker network DNS)
+    if (totalConnections === 0) {
+      try {
+        const result3 = await execAsync(
+          `ss -tn state established | grep -E "${projectName}:${internalPort}|${projectName.toLowerCase()}:${internalPort}" | wc -l`,
+          { shell: "/bin/sh" }
+        );
+        totalConnections = parseInt(result3.stdout.trim(), 10) || 0;
+      } catch (error) {
+        // Ignore
+      }
     }
 
     // Fallback to netstat if ss is not available
