@@ -206,9 +206,12 @@ export function DeployModal({
           // Prevent clicks inside modal from closing it
           e.stopPropagation();
         }}
+        style={{
+          maxHeight: isMaximized ? "100vh" : "90vh",
+        }}
       >
         {/* Header Toolbar */}
-        <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+        <header className="flex-shrink-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between flex-wrap gap-4">
           <h2 className="text-lg font-semibold text-gray-900 mr-auto">Deploy log</h2>
           <div className="flex items-center gap-2 flex-wrap">
             {projectDomain && (
@@ -267,6 +270,9 @@ export function DeployModal({
         <div 
           className="flex-1 min-h-0 bg-black overflow-hidden flex flex-col" 
           id="deploy-logs-container"
+          style={{
+            height: 0, // Force flex-1 to work
+          }}
         >
           <div 
             className="flex-1 overflow-y-auto min-h-0"
@@ -274,8 +280,13 @@ export function DeployModal({
               // Stop wheel events from propagating to body
               e.stopPropagation();
             }}
+            onTouchMove={(e) => {
+              // Stop touch events from propagating to body
+              e.stopPropagation();
+            }}
             style={{ 
-              overscrollBehavior: "contain"
+              overscrollBehavior: "contain",
+              WebkitOverflowScrolling: "touch"
             }}
           >
             {/* Building Phase */}
