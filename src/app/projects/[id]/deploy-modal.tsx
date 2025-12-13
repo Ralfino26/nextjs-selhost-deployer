@@ -32,6 +32,7 @@ export function DeployModal({
 }: DeployModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(["building"]));
+  const [userCollapsedPhases, setUserCollapsedPhases] = useState<Set<string>>(new Set());
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -100,13 +101,31 @@ export function DeployModal({
   const buildLogLines = formatLogsWithLineNumbers(buildLogs);
   const deployLogLines = formatLogsWithLineNumbers(deployPhaseLogs);
 
+  // Auto-expand phases when they become active (unless user explicitly collapsed them)
+  useEffect(() => {
+    if (deployPhases.building === "active" && !userCollapsedPhases.has("building")) {
+      setExpandedPhases((prev) => new Set(prev).add("building"));
+    }
+    if (deployPhases.deploying === "active" && !userCollapsedPhases.has("deploying")) {
+      setExpandedPhases((prev) => new Set(prev).add("deploying"));
+    }
+  }, [deployPhases.building, deployPhases.deploying, userCollapsedPhases]);
+
   const togglePhase = (phaseKey: string) => {
     setExpandedPhases((prev) => {
       const next = new Set(prev);
       if (next.has(phaseKey)) {
         next.delete(phaseKey);
+        // Remember that user explicitly collapsed this phase
+        setUserCollapsedPhases((prev) => new Set(prev).add(phaseKey));
       } else {
         next.add(phaseKey);
+        // User expanded it, so remove from collapsed set
+        setUserCollapsedPhases((prev) => {
+          const next = new Set(prev);
+          next.delete(phaseKey);
+          return next;
+        });
       }
       return next;
     });
@@ -293,7 +312,7 @@ export function DeployModal({
             {(buildLogs.length > 0 || deployPhases.building !== "pending") && (
               <details
                 id="building"
-                open={expandedPhases.has("building") || deployPhases.building === "active"}
+                open={expandedPhases.has("building")}
                 className="border-t border-gray-800"
               >
                 <summary
@@ -363,7 +382,7 @@ export function DeployModal({
             {(deployPhaseLogs.length > 0 || deployPhases.deploying !== "pending") && (
               <details
                 id="deploying"
-                open={expandedPhases.has("deploying") || deployPhases.deploying === "active"}
+                open={expandedPhases.has("deploying")}
                 className="border-t border-gray-800"
               >
                 <summary
