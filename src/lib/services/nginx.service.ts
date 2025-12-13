@@ -60,19 +60,20 @@ async function getNPMToken(): Promise<string> {
 
 async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
   // Return cached hosts if available (cache for 5 minutes)
-  // But only if token is still valid
-  if (npmProxyHosts && npmToken && Date.now() < npmTokenExpiry - 300000) {
+  if (npmProxyHosts && Date.now() < npmTokenExpiry - 300000) {
     return npmProxyHosts;
   }
 
   const { config } = await import("../config");
   const npmUrl = config.npmUrl || process.env.NPM_URL || "http://nginx-proxy-manager:81";
   
-  if (!npmUrl) {
-    throw new Error("NPM URL not configured. Please set it in Settings.");
+  let token: string;
+  try {
+    token = await getNPMToken();
+  } catch (error: any) {
+    console.error("Failed to get NPM token:", error);
+    throw new Error(`Failed to get NPM token: ${error?.message || error}`);
   }
-  
-  const token = await getNPMToken();
 
   try {
     const response = await fetch(`${npmUrl}/api/nginx/proxy-hosts`, {
@@ -84,22 +85,17 @@ async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
     });
 
     if (!response.ok) {
-      // Clear cache on error
-      npmProxyHosts = null;
-      if (response.status === 401) {
-        // Token expired, clear it
-        npmToken = null;
-        npmTokenExpiry = 0;
-      }
-      throw new Error(`Failed to fetch proxy hosts: ${response.statusText} (${response.status})`);
+      const errorText = await response.text().catch(() => response.statusText);
+      console.error(`NPM API error: ${response.status} ${errorText}`);
+      throw new Error(`Failed to fetch proxy hosts: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
     npmProxyHosts = data.filter((host: NPMProxyHost) => host.enabled) as NPMProxyHost[];
+    console.log(`Successfully fetched ${npmProxyHosts.length} proxy hosts from NPM`);
     return npmProxyHosts;
   } catch (error: any) {
-    // Clear cache on error
-    npmProxyHosts = null;
+    console.error("Error fetching NPM proxy hosts:", error);
     throw new Error(`Failed to get NPM proxy hosts: ${error?.message || error}`);
   }
 }
@@ -110,7 +106,14 @@ export async function getDomainForProject(
   port: number
 ): Promise<string | null> {
   try {
-    const hosts = await getNPMProxyHosts();
+    let hosts: NPMProxyHost[];
+    try {
+      hosts = await getNPMProxyHosts();
+    } catch (error: any) {
+      console.error(`Failed to get NPM proxy hosts for project ${projectName}:`, error);
+      // Return null instead of throwing, so the project can still be displayed
+      return null;
+    }
     
     console.log(`Looking for domain for project ${projectName} on port ${port}`);
     console.log(`Found ${hosts.length} proxy hosts in NPM`);
