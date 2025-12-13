@@ -16,38 +16,52 @@ async function getDatabaseConfig(projectName: string): Promise<{
   username: string;
   password: string;
 }> {
+  console.log(`[BACKUP] [getDatabaseConfig] Getting database config for project: ${projectName}`);
   const projectDir = join(config.projectsBaseDir, projectName);
+  console.log(`[BACKUP] [getDatabaseConfig] Project directory: ${projectDir}`);
+  
   const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
+  console.log(`[BACKUP] [getDatabaseConfig] Looking for docker-compose.yml at: ${databaseComposePath}`);
   
   if (!existsSync(databaseComposePath)) {
+    console.error(`[BACKUP] [getDatabaseConfig] ✗ Database docker-compose.yml not found: ${databaseComposePath}`);
     throw new Error(`Database docker-compose.yml not found for project ${projectName}`);
   }
+  console.log(`[BACKUP] [getDatabaseConfig] ✓ Database docker-compose.yml exists`);
   
   try {
+    console.log(`[BACKUP] [getDatabaseConfig] Reading docker-compose.yml content...`);
     const databaseComposeContent = await readFile(databaseComposePath, "utf-8");
+    console.log(`[BACKUP] [getDatabaseConfig] ✓ Read ${databaseComposeContent.length} bytes from docker-compose.yml`);
     
     // Extract database name
     const dbNameMatch = databaseComposeContent.match(/MONGO_INITDB_DATABASE:\s*(\w+)/);
     const databaseName = dbNameMatch ? dbNameMatch[1] : projectName;
+    console.log(`[BACKUP] [getDatabaseConfig] Extracted database name: ${databaseName} (match: ${dbNameMatch ? "found" : "not found, using project name"})`);
     
     // Extract username
     const usernameMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_USERNAME:\s*(\w+)/);
     const username = usernameMatch ? usernameMatch[1] : config.database.user;
+    console.log(`[BACKUP] [getDatabaseConfig] Extracted username: ${username} (match: ${usernameMatch ? "found" : "not found, using config default"})`);
     
     // Extract password
     const passwordMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_PASSWORD:\s*([^\s]+)/);
     const password = passwordMatch ? passwordMatch[1] : config.database.password;
+    console.log(`[BACKUP] [getDatabaseConfig] Extracted password: ${password ? "***" : "NOT SET"} (match: ${passwordMatch ? "found" : "not found, using config default"})`);
     
     if (!username || !password) {
+      console.error(`[BACKUP] [getDatabaseConfig] ✗ Missing credentials - Username: ${username ? "set" : "missing"}, Password: ${password ? "set" : "missing"}`);
       throw new Error(`Could not extract MongoDB credentials from docker-compose.yml for project ${projectName}`);
     }
     
+    console.log(`[BACKUP] [getDatabaseConfig] ✓ Database config extracted successfully`);
     return {
       databaseName,
       username,
       password,
     };
   } catch (error: any) {
+    console.error(`[BACKUP] [getDatabaseConfig] ✗ Error reading config: ${error.message || error}`);
     throw new Error(`Failed to read database configuration: ${error.message || error}`);
   }
 }
@@ -161,50 +175,83 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     // Execute mongodump inside the container to /tmp/backup
     const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /tmp/backup`;
     
-    console.log(`Running mongodump: ${mongodumpCommand}`);
+    console.log(`[BACKUP] [mongodump] Executing mongodump command...`);
+    console.log(`[BACKUP] [mongodump] Command: docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password *** --db ${databaseName} --out /tmp/backup`);
+    
+    const dumpStartTime = Date.now();
     const dumpResult = await execAsync(mongodumpCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
     });
-    console.log(`Mongodump output: ${dumpResult.stdout}`);
+    const dumpDuration = Date.now() - dumpStartTime;
+    
+    console.log(`[BACKUP] [mongodump] ✓ Mongodump completed in ${dumpDuration}ms`);
+    if (dumpResult.stdout) {
+      console.log(`[BACKUP] [mongodump] Stdout: ${dumpResult.stdout}`);
+    }
     if (dumpResult.stderr) {
-      console.warn(`Mongodump warnings: ${dumpResult.stderr}`);
+      console.warn(`[BACKUP] [mongodump] Stderr (warnings): ${dumpResult.stderr}`);
     }
     
     // Verify the dump was created in the container
+    console.log(`[BACKUP] [verify] Verifying backup was created in container...`);
     const verifyDumpCommand = `docker exec ${dbContainerName} ls -la /tmp/backup/${databaseName}`;
     try {
       const verifyResult = await execAsync(verifyDumpCommand, {
         shell: "/bin/sh",
         env: { ...process.env },
       });
-      console.log(`Backup contents in container: ${verifyResult.stdout}`);
+      console.log(`[BACKUP] [verify] ✓ Backup directory exists in container: /tmp/backup/${databaseName}`);
+      console.log(`[BACKUP] [verify] Contents: ${verifyResult.stdout}`);
+      
+      // Count files
+      const fileCount = (verifyResult.stdout.match(/-rw-r--r--/g) || []).length;
+      console.log(`[BACKUP] [verify] Found ${fileCount} files in backup directory`);
     } catch (verifyError: any) {
-      console.error(`Failed to verify backup in container: ${verifyError.message}`);
+      console.error(`[BACKUP] [verify] ✗ Failed to verify backup in container: ${verifyError.message}`);
       // Try listing /tmp/backup to see what's there
+      console.log(`[BACKUP] [verify] Trying to list /tmp/backup directory...`);
       const listBackupCommand = `docker exec ${dbContainerName} ls -la /tmp/backup`;
       try {
         const listResult = await execAsync(listBackupCommand, {
           shell: "/bin/sh",
           env: { ...process.env },
         });
-        console.log(`Contents of /tmp/backup: ${listResult.stdout}`);
+        console.log(`[BACKUP] [verify] Contents of /tmp/backup: ${listResult.stdout}`);
       } catch (listError) {
-        console.error(`Failed to list /tmp/backup: ${listError}`);
+        console.error(`[BACKUP] [verify] ✗ Failed to list /tmp/backup: ${listError}`);
       }
+      throw verifyError;
     }
     
     // Copy the backup from container to host backup directory
     // Use . at the end to copy contents of the directory, not the directory itself
+    console.log(`[BACKUP] [copy] Copying backup from container to host...`);
     const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName}/. ${backupPath}`;
-    console.log(`Copying backup: ${copyCommand}`);
+    console.log(`[BACKUP] [copy] Command: ${copyCommand}`);
+    console.log(`[BACKUP] [copy] Source: ${dbContainerName}:/tmp/backup/${databaseName}/.`);
+    console.log(`[BACKUP] [copy] Destination: ${backupPath}`);
+    
+    // Check if destination directory exists before copy
+    if (!existsSync(backupPath)) {
+      console.error(`[BACKUP] [copy] ✗ Destination directory does not exist: ${backupPath}`);
+      throw new Error(`Destination directory does not exist: ${backupPath}`);
+    }
+    console.log(`[BACKUP] [copy] ✓ Destination directory exists: ${backupPath}`);
+    
+    const copyStartTime = Date.now();
     const copyResult = await execAsync(copyCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
     });
-    console.log(`Copy output: ${copyResult.stdout}`);
+    const copyDuration = Date.now() - copyStartTime;
+    
+    console.log(`[BACKUP] [copy] ✓ Copy completed in ${copyDuration}ms`);
+    if (copyResult.stdout) {
+      console.log(`[BACKUP] [copy] Stdout: ${copyResult.stdout}`);
+    }
     if (copyResult.stderr) {
-      console.warn(`Copy warnings: ${copyResult.stderr}`);
+      console.warn(`[BACKUP] [copy] Stderr (warnings): ${copyResult.stderr}`);
     }
     
     // Verify backup was created
