@@ -1,12 +1,34 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import { join } from "path";
-import { mkdir } from "fs/promises";
+import { mkdir, readFile } from "fs/promises";
 import { existsSync } from "fs";
 import { config } from "@/lib/config";
 import { getDocker } from "./docker.service";
 
 const execAsync = promisify(exec);
+
+/**
+ * Get database name from docker-compose.yml
+ */
+async function getDatabaseName(projectName: string): Promise<string> {
+  const projectDir = join(config.projectsBaseDir, projectName);
+  const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
+  
+  if (!existsSync(databaseComposePath)) {
+    // Fallback to project name if docker-compose.yml doesn't exist
+    return projectName;
+  }
+  
+  try {
+    const databaseComposeContent = await readFile(databaseComposePath, "utf-8");
+    const dbNameMatch = databaseComposeContent.match(/MONGO_INITDB_DATABASE:\s*(\w+)/);
+    return dbNameMatch ? dbNameMatch[1] : projectName;
+  } catch (error) {
+    // Fallback to project name on error
+    return projectName;
+  }
+}
 
 /**
  * Create a MongoDB backup for a project
@@ -15,12 +37,14 @@ const execAsync = promisify(exec);
  */
 export async function createMongoBackup(projectName: string): Promise<string> {
   const dbContainerName = `${projectName}-mongo`;
-  const databaseName = projectName;
   const backupBaseDir = config.backupBaseDir || "/srv/vps/backups";
   
   if (!backupBaseDir) {
     throw new Error("Backup base directory not configured. Please set it in Settings.");
   }
+  
+  // Get the actual database name from docker-compose.yml
+  const databaseName = await getDatabaseName(projectName);
   
   // Ensure backup directory exists
   await mkdir(backupBaseDir, { recursive: true });
@@ -58,6 +82,7 @@ export async function createMongoBackup(projectName: string): Promise<string> {
   // mongodump will create a dump directory with the database backup
   try {
     // Run mongodump inside the container
+    // Authenticate with admin database, then dump the specific database
     const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /tmp/backup`;
     
     await execAsync(mongodumpCommand, {
