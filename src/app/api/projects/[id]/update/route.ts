@@ -41,19 +41,22 @@ export async function POST(
     try {
       const remoteResult = await execAsync("git config --get remote.origin.url", { 
         cwd: repoPath,
-        shell: "/bin/sh"
+        shell: "/bin/sh",
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
       });
       remoteUrl = remoteResult.stdout.trim();
+      console.log(`[GIT PULL] Current remote URL: ${remoteUrl.replace(/https:\/\/[^@]+@/, "https://***@")}`);
     } catch (error: any) {
-      console.error("Failed to get remote URL:", error);
+      console.error("[GIT PULL] Failed to get remote URL:", error);
       return NextResponse.json(
         { error: "Failed to get git remote URL. Is this a git repository?" },
         { status: 400 }
       );
     }
 
-    // If it's a GitHub URL and we have a token, use it
+    // If it's a GitHub URL and we have a token, update it
     if (remoteUrl.includes("github.com") && config.githubToken) {
+      console.log(`[GIT PULL] GitHub repository detected, updating remote URL with token...`);
       // Extract repo path from URL
       let repoPathFromUrl = remoteUrl;
       
@@ -89,32 +92,75 @@ export async function POST(
 
       // Update remote URL with token (same format as used in clone)
       const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
-      console.log(`Updating remote URL from: ${remoteUrl} to: https://***@github.com/${repoPathFromUrl}.git`);
+      console.log(`[GIT PULL] Updating remote URL from: ${remoteUrl.replace(/https:\/\/[^@]+@/, "https://***@")} to: https://***@github.com/${repoPathFromUrl}.git`);
       
       try {
         await execAsync(`git remote set-url origin "${newUrl}"`, { 
           cwd: repoPath,
-          shell: "/bin/sh"
+          shell: "/bin/sh",
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
         });
+        console.log(`[GIT PULL] ✓ Remote URL updated successfully`);
+        
+        // Verify the remote URL was updated
+        const verifyRemoteResult = await execAsync("git config --get remote.origin.url", {
+          cwd: repoPath,
+          shell: "/bin/sh",
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
+        });
+        const verifiedUrl = verifyRemoteResult.stdout.trim();
+        console.log(`[GIT PULL] Verified remote URL: ${verifiedUrl.replace(/https:\/\/[^@]+@/, "https://***@")}`);
       } catch (error: any) {
-        console.error("Failed to update remote URL:", error);
+        console.error("[GIT PULL] Failed to update remote URL:", error);
         return NextResponse.json(
           { error: `Failed to update git remote: ${error.message}` },
           { status: 500 }
         );
       }
+    } else if (remoteUrl.includes("github.com") && !config.githubToken) {
+      console.warn("[GIT PULL] GitHub repository detected but no token configured");
     }
 
     // Now pull
     try {
       // Get current branch first
+      console.log(`[GIT PULL] Getting current branch...`);
       const branchResult = await execAsync("git branch --show-current", {
         cwd: repoPath,
-        shell: "/bin/sh"
+        shell: "/bin/sh",
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
       });
       const currentBranch = branchResult.stdout.trim();
+      console.log(`[GIT PULL] Current branch: ${currentBranch || "NOT FOUND"}`);
       
       if (!currentBranch) {
+        // Try alternative method to get branch
+        console.log(`[GIT PULL] Trying alternative method to get branch...`);
+        try {
+          const altBranchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
+            cwd: repoPath,
+            shell: "/bin/sh",
+            env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
+          });
+          const altBranch = altBranchResult.stdout.trim();
+          if (altBranch && altBranch !== "HEAD") {
+            console.log(`[GIT PULL] Found branch via alternative method: ${altBranch}`);
+            // Use the alternative branch
+            const pullResult = await execAsync(`git pull origin ${altBranch}`, { 
+              cwd: repoPath,
+              shell: "/bin/sh",
+              env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
+            });
+            return NextResponse.json({
+              success: true,
+              message: "Project updated successfully",
+              output: pullResult.stdout,
+            });
+          }
+        } catch (altError) {
+          console.error("[GIT PULL] Alternative branch detection failed:", altError);
+        }
+        
         return NextResponse.json(
           { error: "Could not determine current branch" },
           { status: 400 }
@@ -122,11 +168,16 @@ export async function POST(
       }
 
       // Pull with token in URL (already set above)
+      console.log(`[GIT PULL] Pulling from origin/${currentBranch}...`);
       const pullResult = await execAsync(`git pull origin ${currentBranch}`, { 
         cwd: repoPath,
         shell: "/bin/sh",
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
       });
+      console.log(`[GIT PULL] ✓ Pull successful`);
+      if (pullResult.stdout) {
+        console.log(`[GIT PULL] Pull output: ${pullResult.stdout}`);
+      }
       
       return NextResponse.json({
         success: true,
