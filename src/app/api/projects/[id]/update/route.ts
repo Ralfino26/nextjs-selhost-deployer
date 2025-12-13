@@ -87,8 +87,12 @@ export async function POST(
         );
       }
 
-      // Update remote URL with token
-      const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
+      // Update remote URL with token (use x-access-token format for better compatibility)
+      // GitHub tokens work better with x-access-token or oauth2 format
+      const tokenPrefix = config.githubToken.startsWith("ghp_") || config.githubToken.startsWith("github_pat_") 
+        ? config.githubToken 
+        : `x-access-token:${config.githubToken}`;
+      const newUrl = `https://${tokenPrefix}@github.com/${repoPathFromUrl}.git`;
       console.log(`Updating remote URL from: ${remoteUrl} to: https://***@github.com/${repoPathFromUrl}.git`);
       
       try {
