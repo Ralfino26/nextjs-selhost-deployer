@@ -31,7 +31,6 @@ export default function ProjectDetailPage() {
     status: "up-to-date" | "missing-in-production" | "missing-in-example" | "different" | "only-in-production" | "only-in-example";
   }>>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showDeployLogs, setShowDeployLogs] = useState(false);
   const [deployLogs, setDeployLogs] = useState<string>("");
   const [deployPhases, setDeployPhases] = useState<{
