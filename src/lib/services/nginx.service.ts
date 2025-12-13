@@ -93,7 +93,6 @@ async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
 
     const data = await response.json();
     npmProxyHosts = data.filter((host: NPMProxyHost) => host.enabled) as NPMProxyHost[];
-    console.log(`Successfully fetched ${npmProxyHosts.length} proxy hosts from NPM`);
     return npmProxyHosts;
   } catch (error: any) {
     console.error("Error fetching NPM proxy hosts:", error);
@@ -116,41 +115,28 @@ export async function getDomainForProject(
       return null;
     }
     
-    console.log(`Looking for domain for project ${projectName} on port ${port}`);
-    console.log(`Found ${hosts.length} proxy hosts in NPM`);
-    
     if (hosts.length === 0) {
-      console.log("No proxy hosts found in NPM");
       return null;
     }
-    
-    // Log all hosts for debugging
-    hosts.forEach((host) => {
-      console.log(`NPM Host: ${host.domain_names[0]} -> ${host.forward_scheme}://${host.forward_host}:${host.forward_port}`);
-    });
     
     // Try to match by container name first (NPM often forwards to container name)
     // NPM typically forwards to: http://container-name:3000 or http://localhost:port
     let matchingHost = hosts.find((host) => {
       // Remove http:// or https:// prefix if present
       let forwardHost = host.forward_host.toLowerCase().replace(/^https?:\/\//, '');
-      console.log(`Checking host: ${host.domain_names[0]} -> ${forwardHost}:${host.forward_port}`);
       
       // Match by container name (most common case)
       if (forwardHost === projectName.toLowerCase()) {
-        console.log(`Matched by container name! Domain: ${host.domain_names[0]}`);
         return true;
       }
       
       // Match by port if forward_host is localhost or 127.0.0.1
       if ((forwardHost === "localhost" || forwardHost === "127.0.0.1") && host.forward_port === port) {
-        console.log(`Matched by localhost + port! Domain: ${host.domain_names[0]}`);
         return true;
       }
       
       // Match if forward_host contains project name
       if (forwardHost.includes(projectName.toLowerCase())) {
-        console.log(`Matched by partial container name! Domain: ${host.domain_names[0]}`);
         return true;
       }
       
@@ -159,7 +145,6 @@ export async function getDomainForProject(
 
     // Fallback: if no exact match, try matching by port only (for localhost forwards)
     if (!matchingHost) {
-      console.log(`No exact match found, trying port-only match for port ${port}`);
       matchingHost = hosts.find((host) => {
         const forwardHost = host.forward_host.toLowerCase().replace(/^https?:\/\//, '');
         // Only match by port if it's localhost/127.0.0.1
@@ -168,9 +153,6 @@ export async function getDomainForProject(
         }
         return false;
       });
-      if (matchingHost) {
-        console.log(`Matched by port only! Domain: ${matchingHost.domain_names[0]}`);
-      }
     }
 
     if (matchingHost && matchingHost.domain_names.length > 0) {
@@ -178,7 +160,6 @@ export async function getDomainForProject(
       return matchingHost.domain_names[0];
     }
 
-    console.log(`No matching domain found for ${projectName} on port ${port}`);
     return null;
   } catch (error: any) {
     console.error("Error getting domain from NPM:", error?.message || error);

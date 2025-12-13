@@ -35,10 +35,12 @@ export default function Home() {
       }
       
       const data = await response.json();
-      console.log("Projects fetched:", data);
       setProjects(data);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
+    } catch (error: any) {
+      // Only log non-network errors (network errors are normal during navigation)
+      if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+        console.error("Error fetching projects:", error);
+      }
     } finally {
       setLoading(false);
     }

@@ -133,8 +133,11 @@ export default function ProjectDetailPage() {
             }
           }
         }
-      } catch (error) {
-        console.error("Error in metrics stream:", error);
+      } catch (error: any) {
+        // Only log non-network errors (network errors are normal when streams are aborted)
+        if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+          console.error("Error in metrics stream:", error);
+        }
         // Silently reconnect after a delay
         if (isActive && autoRefresh) {
           setTimeout(() => {
@@ -167,8 +170,11 @@ export default function ProjectDetailPage() {
         setProject(data);
         setLastRefresh(new Date());
       }
-    } catch (error) {
-      console.error("Error fetching project:", error);
+    } catch (error: any) {
+      // Only log non-network errors (network errors are normal during navigation)
+      if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+        console.error("Error fetching project:", error);
+      }
     } finally {
       if (!silent) {
         setLoading(false);
@@ -271,8 +277,11 @@ export default function ProjectDetailPage() {
             }
           }
         }
-      } catch (error) {
-        console.error("Error in logs stream:", error);
+      } catch (error: any) {
+        // Only log non-network errors (network errors are normal when streams are aborted)
+        if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+          console.error("Error in logs stream:", error);
+        }
         setLogsStreamActive(false);
         // Silently reconnect after a delay
         if (isActive && project && actionLoading === null) {
