@@ -3,7 +3,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { join } from "path";
 import { config } from "@/lib/config";
-import { deployProject } from "@/lib/services/docker.service";
+import { isAuthenticated } from "@/lib/auth";
 
 const execAsync = promisify(exec);
 
@@ -11,6 +11,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isAuthenticated(request)) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   try {
     const { id } = await params;
     const projectName = id;
@@ -32,86 +36,89 @@ export async function POST(
 
     const repoPath = join(projectDir, repoDir.name);
 
-    // Always use GitHub token if available
-    if (!config.githubToken) {
+    // Get current remote URL first
+    let remoteUrl: string;
+    try {
+      const remoteResult = await execAsync("git config --get remote.origin.url", { 
+        cwd: repoPath,
+        shell: "/bin/sh"
+      });
+      remoteUrl = remoteResult.stdout.trim();
+    } catch (error: any) {
+      console.error("Failed to get remote URL:", error);
       return NextResponse.json(
-        { error: "GitHub token not configured. Please set it in Settings." },
+        { error: "Failed to get git remote URL. Is this a git repository?" },
         { status: 400 }
       );
     }
 
-    // Use gh repo sync as per your workflow (with token)
-    try {
-      const env = { ...process.env, GITHUB_TOKEN: config.githubToken };
-      await execAsync("gh repo sync", { cwd: repoPath, env, shell: "/bin/sh" });
-    } catch (error) {
-      // Fall back to git pull if gh CLI not available
-      console.warn("GitHub CLI not available, falling back to git pull with token");
+    // If it's a GitHub URL and we have a token, use it
+    if (remoteUrl.includes("github.com") && config.githubToken) {
+      // Extract repo path from URL
+      let repoPathFromUrl = remoteUrl;
       
+      if (repoPathFromUrl.startsWith("git@")) {
+        // git@github.com:owner/repo.git -> owner/repo
+        repoPathFromUrl = repoPathFromUrl.replace("git@github.com:", "").replace(/\.git$/, "");
+      } else if (repoPathFromUrl.startsWith("https://")) {
+        // https://github.com/owner/repo.git -> owner/repo
+        // Or https://token@github.com/owner/repo.git -> owner/repo
+        repoPathFromUrl = repoPathFromUrl.replace(/^https:\/\/([^@]+@)?github\.com\//, "").replace(/\.git$/, "");
+      } else {
+        repoPathFromUrl = repoPathFromUrl.replace(/\.git$/, "");
+      }
+      
+      // Clean up the repo path
+      repoPathFromUrl = repoPathFromUrl.trim();
+      
+      if (!repoPathFromUrl) {
+        return NextResponse.json(
+          { error: "Could not extract repository path from remote URL" },
+          { status: 400 }
+        );
+      }
+
+      // Update remote URL with token
+      const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
       try {
-        // Get current remote URL
-        const remoteResult = await execAsync("git config --get remote.origin.url", { 
+        await execAsync(`git remote set-url origin "${newUrl}"`, { 
           cwd: repoPath,
           shell: "/bin/sh"
         });
-        const remoteUrl = remoteResult.stdout.trim();
-        
-        // If it's a GitHub URL, update remote with token
-        if (remoteUrl.includes("github.com")) {
-          // Extract repo path from URL (handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git)
-          let repoPathFromUrl = remoteUrl;
-          
-          if (repoPathFromUrl.startsWith("git@")) {
-            // git@github.com:owner/repo.git -> owner/repo
-            repoPathFromUrl = repoPathFromUrl.replace("git@github.com:", "").replace(".git", "");
-          } else if (repoPathFromUrl.startsWith("https://")) {
-            // https://github.com/owner/repo.git -> owner/repo
-            // Or https://token@github.com/owner/repo.git -> owner/repo
-            repoPathFromUrl = repoPathFromUrl.replace(/^https:\/\/([^@]+@)?github\.com\//, "").replace(".git", "");
-          } else {
-            // Already just owner/repo format
-            repoPathFromUrl = repoPathFromUrl.replace(".git", "");
-          }
-          
-          // Ensure we have a clean owner/repo format
-          repoPathFromUrl = repoPathFromUrl.trim();
-          
-          // Update remote URL with token
-          const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
-          await execAsync(`git remote set-url origin "${newUrl}"`, { 
-            cwd: repoPath,
-            shell: "/bin/sh"
-          });
-          
-          // Now pull with the updated remote
-          await execAsync("git pull", { 
-            cwd: repoPath,
-            shell: "/bin/sh"
-          });
-        } else {
-          // Not a GitHub URL, just pull normally
-          await execAsync("git pull", { 
-            cwd: repoPath,
-            shell: "/bin/sh"
-          });
-        }
-      } catch (gitError: any) {
-        console.error("Git pull failed:", gitError);
-        throw new Error(`Failed to update repository: ${gitError.message}`);
+      } catch (error: any) {
+        console.error("Failed to update remote URL:", error);
+        return NextResponse.json(
+          { error: `Failed to update git remote: ${error.message}` },
+          { status: 500 }
+        );
       }
     }
 
-    // Rebuild and redeploy
-    await deployProject(projectName);
-
-    return NextResponse.json({
-      success: true,
-      message: "Project updated and redeployed",
-    });
-  } catch (error) {
+    // Now pull
+    try {
+      const pullResult = await execAsync("git pull origin $(git branch --show-current)", { 
+        cwd: repoPath,
+        shell: "/bin/sh",
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
+      });
+      
+      return NextResponse.json({
+        success: true,
+        message: "Project updated successfully",
+        output: pullResult.stdout,
+      });
+    } catch (gitError: any) {
+      console.error("Git pull failed:", gitError);
+      const errorMessage = gitError.stderr || gitError.message || "Unknown error";
+      return NextResponse.json(
+        { error: `Failed to update repository: ${errorMessage}` },
+        { status: 500 }
+      );
+    }
+  } catch (error: any) {
     console.error("Error updating project:", error);
     return NextResponse.json(
-      { error: "Failed to update project" },
+      { error: error.message || "Failed to update project" },
       { status: 500 }
     );
   }
