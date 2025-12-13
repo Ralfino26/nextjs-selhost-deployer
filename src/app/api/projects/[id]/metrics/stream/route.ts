@@ -143,29 +143,17 @@ export async function GET(
                 }
               }
 
-              // Get visitor stats (only every 5 seconds to reduce load)
-              let visitorStats: ProjectDetails["visitorStats"] | undefined;
-              try {
-                visitorStats = await getVisitorStats(projectName, port);
-              } catch (error) {
-                // Visitor stats failed, continue without them
-              }
-
               // Send updated metrics
               sendData({
                 status,
                 containerMetrics,
                 containerHealth,
-                visitorStats,
                 lastDeployment: info.State.StartedAt ? new Date(info.State.StartedAt).toLocaleString() : undefined,
               });
             } else {
               // Container not running
               sendData({
                 status,
-                visitorStats: {
-                  activeConnections: 0,
-                },
               });
             }
 
