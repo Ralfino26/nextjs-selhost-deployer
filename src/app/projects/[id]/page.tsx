@@ -495,7 +495,6 @@ export default function ProjectDetailPage() {
     }
 
     setActionLoading("delete");
-    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}`, {
@@ -503,15 +502,22 @@ export default function ProjectDetailPage() {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
       if (response.ok) {
+        toast.success("Project deleted", {
+          description: "Project has been successfully deleted",
+        });
         router.push("/");
       } else {
         const error = await response.json();
-        setActionMessage({ type: "error", text: error.error || "Failed to delete project" });
+        toast.error("Delete failed", {
+          description: error.error || "Failed to delete project",
+        });
         setActionLoading(null);
       }
     } catch (error) {
       console.error("Error deleting:", error);
-      setActionMessage({ type: "error", text: "Failed to delete project" });
+      toast.error("Delete failed", {
+        description: "Failed to delete project",
+      });
       setActionLoading(null);
     }
   };
