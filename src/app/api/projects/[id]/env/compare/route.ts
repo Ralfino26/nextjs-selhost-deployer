@@ -153,6 +153,7 @@ export async function GET(
     // Sort by status priority, then by key
     const statusPriority: Record<EnvComparison["status"], number> = {
       "missing-in-production": 1,
+      "missing-in-example": 1,
       "different": 2,
       "only-in-production": 3,
       "only-in-example": 4,
