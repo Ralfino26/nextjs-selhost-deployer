@@ -107,14 +107,6 @@ export async function createMongoBackup(projectName: string): Promise<string> {
       env: { ...process.env },
     });
     
-    // Clean up the backup inside the container
-    await execAsync(`docker exec ${dbContainerName} rm -rf /tmp/backup`, {
-      shell: "/bin/sh",
-      env: { ...process.env },
-    }).catch(() => {
-      // Ignore cleanup errors
-    });
-    
     // Verify backup was created
     if (!existsSync(backupPath)) {
       throw new Error(`Backup directory was not created: ${backupPath}`);
