@@ -446,10 +446,15 @@ export default function ProjectDetailPage() {
                 setDeployLogs((prev) => prev + logText);
                 
                 // Detect phase transitions
-                if (logText.includes("🔨 Starting build") || logText.includes("Starting build")) {
+                if (logText.includes("🛑 Stopping containers") || logText.includes("Stopping containers")) {
                   setDeployPhases((prev) => ({
                     ...prev,
                     initializing: "complete",
+                    building: "active", // Use building phase for stopping
+                  }));
+                } else if (logText.includes("🔨 Building images") || logText.includes("🔨 Starting build") || logText.includes("Building images") || logText.includes("Starting build")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
                     building: "active",
                   }));
                 } else if (logText.includes("✅ Build completed") || logText.includes("Build completed")) {
@@ -1278,10 +1283,10 @@ export default function ProjectDetailPage() {
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-700 mb-1">
-                  .env up to date?
+                  Klaar om te deployen?
                 </p>
                 <p className="text-xs text-gray-500">
-                  Build en deploy naar productie
+                  Stop containers, build nieuwe images en start opnieuw
                 </p>
               </div>
               <Button
@@ -1289,7 +1294,7 @@ export default function ProjectDetailPage() {
                   handleDeploy();
                 }}
                 disabled={actionLoading !== null}
-                className="min-w-[120px] bg-blue-600 hover:bg-blue-700"
+                className="min-w-[140px] bg-blue-600 hover:bg-blue-700"
               >
                 {actionLoading === "deploy" ? (
                   <>
@@ -1299,39 +1304,7 @@ export default function ProjectDetailPage() {
                 ) : (
                   <>
                     <span className="mr-2">🚀</span>
-                    Deploy
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="border-t border-blue-200"></div>
-
-            {/* Restart Website */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 mb-1">
-                  Restart Website
-                </p>
-                <p className="text-xs text-gray-500">
-                  Herstart de website container
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleRestart}
-                disabled={actionLoading !== null}
-                className="min-w-[120px]"
-              >
-                {actionLoading === "restart" ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Restarting...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">🔄</span>
-                    Restart
+                    Deploy & Restart
                   </>
                 )}
               </Button>

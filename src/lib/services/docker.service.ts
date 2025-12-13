@@ -17,7 +17,12 @@ export async function deployProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposeDir = join(projectDir, "docker");
 
-  // Run docker compose build and up -d (as per your workflow)
+  // Down, build, and up -d for clean deployment
+  // This ensures new images are always used and config changes are applied
+  await execAsync(`docker compose down`, {
+    cwd: dockerComposeDir,
+  });
+  
   await execAsync(`docker compose build`, {
     cwd: dockerComposeDir,
   });
@@ -37,9 +42,43 @@ export async function deployProjectWithLogs(
 
   const { spawn } = await import("child_process");
 
+  // Down with streaming
+  await new Promise<void>((resolve, reject) => {
+    onLog("🛑 Stopping containers...\n");
+    const downProcess = spawn("docker", ["compose", "down"], {
+      cwd: dockerComposeDir,
+      shell: "/bin/sh",
+    });
+
+    downProcess.stdout?.on("data", (data) => {
+      onLog(data.toString());
+    });
+
+    downProcess.stderr?.on("data", (data) => {
+      onLog(data.toString());
+    });
+
+    downProcess.on("close", (code) => {
+      if (code === 0) {
+        onLog("✅ Containers stopped\n");
+        resolve();
+      } else {
+        // Down can fail if containers don't exist, which is fine
+        onLog("ℹ️  No containers to stop (this is OK)\n");
+        resolve();
+      }
+    });
+
+    downProcess.on("error", (error) => {
+      // Don't fail on down errors, just log and continue
+      onLog(`ℹ️  Down process warning: ${error.message}\n`);
+      resolve();
+    });
+  });
+
   // Build with streaming
   await new Promise<void>((resolve, reject) => {
-    onLog("🔨 Starting build...\n");
+    onLog("🔨 Building images...\n");
     const buildProcess = spawn("docker", ["compose", "build"], {
       cwd: dockerComposeDir,
       shell: "/bin/sh",

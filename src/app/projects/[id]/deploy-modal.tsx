@@ -51,7 +51,8 @@ export function DeployModal({
 
   // Split logs into phases - memoized
   const { buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
-    const buildStartMarker = "🔨 Starting build";
+    const stopStartMarker = "🛑 Stopping containers";
+    const buildStartMarker = "🔨 Building images";
     const buildEndMarker = "✅ Build completed";
     const deployStartMarker = "🚀 Starting containers";
     const deployEndMarker = "✅ Deployment completed";
@@ -62,7 +63,11 @@ export function DeployModal({
 
     const lines = deployLogs.split("\n");
     for (const line of lines) {
-      if (line.includes(buildStartMarker)) {
+      if (line.includes(stopStartMarker) || line.includes("Stopping containers")) {
+        // Start of stopping phase, which is part of building phase
+        currentPhase = "build";
+        buildLogsArray.push(line);
+      } else if (line.includes(buildStartMarker) || line.includes("🔨 Starting build") || line.includes("Building images")) {
         currentPhase = "build";
         buildLogsArray.push(line);
       } else if (line.includes(buildEndMarker)) {

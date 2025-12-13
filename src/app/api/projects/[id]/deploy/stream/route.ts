@@ -23,7 +23,42 @@ export async function GET(
       };
 
       try {
-        sendLog("🔨 Starting build...\n");
+        sendLog("🛑 Stopping containers...\n");
+
+        // Down phase
+        await new Promise<void>((resolve, reject) => {
+          const downProcess = spawn("docker", ["compose", "down"], {
+            cwd: dockerComposeDir,
+            shell: "/bin/sh",
+          });
+
+          downProcess.stdout?.on("data", (data) => {
+            sendLog(data.toString());
+          });
+
+          downProcess.stderr?.on("data", (data) => {
+            sendLog(data.toString());
+          });
+
+          downProcess.on("close", (code) => {
+            if (code === 0) {
+              sendLog("✅ Containers stopped\n");
+              resolve();
+            } else {
+              // Down can fail if containers don't exist, which is fine
+              sendLog("ℹ️  No containers to stop (this is OK)\n");
+              resolve();
+            }
+          });
+
+          downProcess.on("error", (error) => {
+            // Don't fail on down errors, just log and continue
+            sendLog(`ℹ️  Down process warning: ${error.message}\n`);
+            resolve();
+          });
+        });
+
+        sendLog("🔨 Building images...\n");
 
         // Build phase
         await new Promise<void>((resolve, reject) => {
