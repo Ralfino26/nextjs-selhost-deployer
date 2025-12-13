@@ -255,11 +255,50 @@ export default function ProjectDetailPage() {
         </Link>
       </div>
 
-      {/* Project Overview Cards */}
-      <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Project Header */}
+      <div className="mb-6 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="mb-2 text-3xl font-bold text-gray-900">{project.name}</h1>
+            <div className="flex items-center gap-3">
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
+                  project.status === "Running"
+                    ? "bg-green-100 text-green-800"
+                    : project.status === "Building"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : project.status === "Error"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-gray-100 text-gray-800"
+                }`}
+              >
+                {project.status}
+              </span>
+              {project.domain && !project.domain.startsWith("ERROR") && (
+                <a
+                  href={`https://${project.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  {project.domain}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Service Cards Grid */}
+      <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Project Info Card */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Project Information</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+              <span className="text-lg">📦</span>
+            </div>
+            <h2 className="text-base font-semibold text-gray-900">Project Information</h2>
+          </div>
           <div className="space-y-2 text-sm">
             <div>
               <span className="font-medium text-gray-600">Name:</span>
@@ -319,58 +358,68 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Git Information Card */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Git Repository</h2>
-          <div className="space-y-2 text-sm">
+        {/* Git Information Card - GitHub Theme */}
+        <div className="rounded-lg border-2 border-gray-800 bg-gray-900 p-5 shadow-lg">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+              <span className="text-lg">🐙</span>
+            </div>
+            <h2 className="text-base font-semibold text-white">Git Repository</h2>
+          </div>
+          <div className="space-y-3 text-sm">
             {project.gitRemote ? (
               <>
-                <div>
-                  <span className="font-medium text-gray-600">Remote:</span>
-                  <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-gray-800 p-2">
+                  <span className="text-xs font-medium text-gray-400">Remote</span>
+                  <p className="mt-1 break-all font-mono text-xs text-gray-200">
                     {project.gitRemote.replace(/https?:\/\/[^@]+@/, "https://***@")}
                   </p>
                 </div>
                 {project.gitBranch && (
-                  <div>
-                    <span className="font-medium text-gray-600">Branch:</span>
-                    <p className="mt-0.5 font-mono text-gray-900">{project.gitBranch}</p>
+                  <div className="rounded-md bg-gray-800 p-2">
+                    <span className="text-xs font-medium text-gray-400">Branch</span>
+                    <p className="mt-1 font-mono text-sm text-white">{project.gitBranch}</p>
                   </div>
                 )}
                 {project.gitCommit && (
-                  <div>
-                    <span className="font-medium text-gray-600">Commit:</span>
-                    <p className="mt-0.5 font-mono text-xs text-gray-900">{project.gitCommit}</p>
+                  <div className="rounded-md bg-gray-800 p-2">
+                    <span className="text-xs font-medium text-gray-400">Commit</span>
+                    <p className="mt-1 font-mono text-xs text-gray-200">{project.gitCommit}</p>
                   </div>
                 )}
                 {project.gitCommitMessage && (
-                  <div>
-                    <span className="font-medium text-gray-600">Message:</span>
-                    <p className="mt-0.5 text-xs text-gray-900">{project.gitCommitMessage}</p>
+                  <div className="rounded-md bg-gray-800 p-2">
+                    <span className="text-xs font-medium text-gray-400">Message</span>
+                    <p className="mt-1 text-xs text-gray-200">{project.gitCommitMessage}</p>
                   </div>
                 )}
                 {project.gitCommitAuthor && (
-                  <div>
-                    <span className="font-medium text-gray-600">Author:</span>
-                    <p className="mt-0.5 text-xs text-gray-900">{project.gitCommitAuthor}</p>
+                  <div className="rounded-md bg-gray-800 p-2">
+                    <span className="text-xs font-medium text-gray-400">Author</span>
+                    <p className="mt-1 text-xs text-gray-200">{project.gitCommitAuthor}</p>
                   </div>
                 )}
                 {project.gitCommitDate && (
-                  <div>
-                    <span className="font-medium text-gray-600">Date:</span>
-                    <p className="mt-0.5 text-xs text-gray-900">{project.gitCommitDate}</p>
+                  <div className="rounded-md bg-gray-800 p-2">
+                    <span className="text-xs font-medium text-gray-400">Date</span>
+                    <p className="mt-1 text-xs text-gray-200">{project.gitCommitDate}</p>
                   </div>
                 )}
               </>
             ) : (
-              <p className="text-gray-500">No git information available</p>
+              <p className="text-gray-400">No git information available</p>
             )}
           </div>
         </div>
 
-        {/* Docker Container Card */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Docker Container</h2>
+        {/* Docker Container Card - Docker Theme */}
+        <div className="rounded-lg border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-white p-5 shadow-lg">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
+              <span className="text-lg">🐳</span>
+            </div>
+            <h2 className="text-base font-semibold text-gray-900">Docker Container</h2>
+          </div>
           <div className="space-y-2 text-sm">
             {project.containerId ? (
               <>
@@ -399,7 +448,7 @@ export default function ProjectDetailPage() {
                       {project.containerNetworks.map((network) => (
                         <span
                           key={network}
-                          className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-mono text-blue-700"
+                          className="rounded bg-blue-100 px-2 py-1 text-xs font-mono text-blue-800"
                         >
                           {network}
                         </span>
@@ -428,19 +477,44 @@ export default function ProjectDetailPage() {
                 {project.containerMetrics && (
                   <>
                     {project.containerMetrics.cpuUsage !== undefined && (
-                      <div>
-                        <span className="font-medium text-gray-600">CPU Usage:</span>
-                        <p className="mt-0.5 text-xs text-gray-900">
-                          {project.containerMetrics.cpuUsage.toFixed(2)}%
-                        </p>
+                      <div className="rounded-md bg-blue-50 p-2">
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-700">CPU Usage</span>
+                          <span className="text-xs font-semibold text-blue-700">
+                            {project.containerMetrics.cpuUsage.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                          <div
+                            className="h-full bg-blue-500 transition-all"
+                            style={{ width: `${Math.min(project.containerMetrics.cpuUsage, 100)}%` }}
+                          />
+                        </div>
                       </div>
                     )}
                     {project.containerMetrics.memoryUsage !== undefined && (
-                      <div>
-                        <span className="font-medium text-gray-600">Memory:</span>
-                        <p className="mt-0.5 text-xs text-gray-900">
+                      <div className="rounded-md bg-blue-50 p-2">
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-700">Memory</span>
+                          <span className="text-xs font-semibold text-blue-700">
+                            {project.containerMetrics.memoryLimit
+                              ? `${((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100).toFixed(1)}%`
+                              : "N/A"}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                          <div
+                            className="h-full bg-blue-500 transition-all"
+                            style={{
+                              width: project.containerMetrics.memoryLimit
+                                ? `${Math.min((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100, 100)}%`
+                                : "0%",
+                            }}
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-600">
                           {project.containerMetrics.memoryLimit
-                            ? `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB / ${(project.containerMetrics.memoryLimit / 1024 / 1024).toFixed(2)} MB (${((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100).toFixed(1)}%)`
+                            ? `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB / ${(project.containerMetrics.memoryLimit / 1024 / 1024).toFixed(2)} MB`
                             : `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB`}
                         </p>
                       </div>
@@ -489,22 +563,27 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Database Information Card */}
+        {/* Database Information Card - MongoDB Theme */}
         {project.database && (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-gray-700">Database Information</h2>
-            <div className="space-y-2 text-sm">
+          <div className="rounded-lg border-2 border-green-600 bg-gradient-to-br from-green-50 to-white p-5 shadow-lg">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-600">
+                <span className="text-lg">🍃</span>
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">MongoDB Database</h2>
+            </div>
+            <div className="space-y-3 text-sm">
               {project.database.containerStatus && (
-                <div>
-                  <span className="font-medium text-gray-600">Status:</span>
-                  <div className="mt-0.5">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Status</span>
+                  <div className="mt-1">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                         project.database.containerStatus === "Running"
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-green-600 text-white"
                           : project.database.containerStatus === "Stopped"
-                          ? "bg-gray-100 text-gray-800"
-                          : "bg-red-100 text-red-800"
+                          ? "bg-gray-400 text-white"
+                          : "bg-red-500 text-white"
                       }`}
                     >
                       {project.database.containerStatus}
@@ -513,50 +592,50 @@ export default function ProjectDetailPage() {
                 </div>
               )}
               {project.database.containerId && (
-                <div>
-                  <span className="font-medium text-gray-600">Container ID:</span>
-                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Container ID</span>
+                  <p className="mt-1 font-mono text-xs text-gray-800">
                     {project.database.containerId}
                   </p>
                 </div>
               )}
               {project.database.containerImage && (
-                <div>
-                  <span className="font-medium text-gray-600">Image:</span>
-                  <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Image</span>
+                  <p className="mt-1 break-all font-mono text-xs text-gray-800">
                     {project.database.containerImage}
                   </p>
                 </div>
               )}
               {project.database.databaseName && (
-                <div>
-                  <span className="font-medium text-gray-600">Database Name:</span>
-                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Database Name</span>
+                  <p className="mt-1 font-mono text-sm font-semibold text-green-700">
                     {project.database.databaseName}
                   </p>
                 </div>
               )}
               {project.database.port && (
-                <div>
-                  <span className="font-medium text-gray-600">Port:</span>
-                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Port</span>
+                  <p className="mt-1 font-mono text-sm text-gray-800">
                     {project.database.port}
                   </p>
                 </div>
               )}
               {project.database.username && (
-                <div>
-                  <span className="font-medium text-gray-600">Username:</span>
-                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Username</span>
+                  <p className="mt-1 font-mono text-xs text-gray-800">
                     {project.database.username}
                   </p>
                 </div>
               )}
               {project.database.connectionString && (
-                <div>
-                  <span className="font-medium text-gray-600">Connection String:</span>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <p className="flex-1 break-all font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Connection String</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="flex-1 break-all font-mono text-xs text-gray-800">
                       {project.database.connectionString}
                     </p>
                     <Button
@@ -567,7 +646,7 @@ export default function ProjectDetailPage() {
                         setActionMessage({ type: "success", text: "Connection string copied to clipboard" });
                         setTimeout(() => setActionMessage(null), 2000);
                       }}
-                      className="h-6 text-xs"
+                      className="h-7 border-green-300 bg-white text-xs text-green-700 hover:bg-green-50"
                     >
                       Copy
                     </Button>
@@ -575,9 +654,9 @@ export default function ProjectDetailPage() {
                 </div>
               )}
               {project.database.volumePath && (
-                <div>
-                  <span className="font-medium text-gray-600">Volume Path:</span>
-                  <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                <div className="rounded-md bg-green-50 p-2">
+                  <span className="text-xs font-medium text-gray-700">Volume Path</span>
+                  <p className="mt-1 break-all font-mono text-xs text-gray-800">
                     {project.database.volumePath}
                   </p>
                 </div>
@@ -587,28 +666,33 @@ export default function ProjectDetailPage() {
         )}
 
         {/* File Paths Card */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">File Paths</h2>
-          <div className="space-y-2 text-sm">
+        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+              <span className="text-lg">📁</span>
+            </div>
+            <h2 className="text-base font-semibold text-gray-900">File Paths</h2>
+          </div>
+          <div className="space-y-3 text-sm">
             {project.repoPath && (
-              <div>
-                <span className="font-medium text-gray-600">Repository:</span>
-                <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+              <div className="rounded-md bg-gray-50 p-2">
+                <span className="text-xs font-medium text-gray-600">Repository</span>
+                <p className="mt-1 break-all font-mono text-xs text-gray-800">
                   {project.repoPath}
                 </p>
               </div>
             )}
             {project.dockerComposePath && (
-              <div>
-                <span className="font-medium text-gray-600">Docker Compose:</span>
-                <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+              <div className="rounded-md bg-gray-50 p-2">
+                <span className="text-xs font-medium text-gray-600">Docker Compose</span>
+                <p className="mt-1 break-all font-mono text-xs text-gray-800">
                   {project.dockerComposePath}
                 </p>
               </div>
             )}
-            <div>
-              <span className="font-medium text-gray-600">Project Directory:</span>
-              <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+            <div className="rounded-md bg-gray-50 p-2">
+              <span className="text-xs font-medium text-gray-600">Project Directory</span>
+              <p className="mt-1 break-all font-mono text-xs text-gray-800">
                 {project.directory}
               </p>
             </div>
