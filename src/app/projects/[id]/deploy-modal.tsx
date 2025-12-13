@@ -21,14 +21,6 @@ interface DeployModalProps {
   isDeploying: boolean;
 }
 
-const phases = [
-  { key: "initializing", label: "Initializing" },
-  { key: "building", label: "Building" },
-  { key: "deploying", label: "Deploying" },
-  { key: "cleanup", label: "Cleanup" },
-  { key: "postProcessing", label: "Post-processing" },
-];
-
 export function DeployModal({
   isOpen,
   onClose,
@@ -39,7 +31,6 @@ export function DeployModal({
   isDeploying,
 }: DeployModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
-  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(["initializing"]));
 
   if (!isOpen) return null;
 
@@ -74,18 +65,6 @@ export function DeployModal({
     if (logContainer) {
       logContainer.scrollTop = logContainer.scrollHeight;
     }
-  };
-
-  const togglePhase = (phaseKey: string) => {
-    setExpandedPhases((prev) => {
-      const next = new Set(prev);
-      if (next.has(phaseKey)) {
-        next.delete(phaseKey);
-      } else {
-        next.add(phaseKey);
-      }
-      return next;
-    });
   };
 
   return (
