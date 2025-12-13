@@ -137,12 +137,8 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     }
     
     // Copy the backup from container to host backup directory
-    // Copy the contents of the database directory, not the directory itself
-    // First create a temp directory, copy to it, then move contents
-    const tempBackupPath = join(projectBackupDir, `temp-${backupDirName}`);
-    await mkdir(tempBackupPath, { recursive: true });
-    
-    const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName} ${tempBackupPath}`;
+    // Use . at the end to copy contents of the directory, not the directory itself
+    const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName}/. ${backupPath}`;
     console.log(`Copying backup: ${copyCommand}`);
     const copyResult = await execAsync(copyCommand, {
       shell: "/bin/sh",
@@ -151,31 +147,6 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     console.log(`Copy output: ${copyResult.stdout}`);
     if (copyResult.stderr) {
       console.warn(`Copy warnings: ${copyResult.stderr}`);
-    }
-    
-    // Move contents from temp directory to final backup directory
-    const { readdir, rename } = await import("fs/promises");
-    const tempDbPath = join(tempBackupPath, databaseName);
-    if (existsSync(tempDbPath)) {
-      const files = await readdir(tempDbPath);
-      for (const file of files) {
-        await rename(join(tempDbPath, file), join(backupPath, file));
-      }
-      // Remove temp directory
-      await execAsync(`rm -rf ${tempBackupPath}`, {
-        shell: "/bin/sh",
-        env: { ...process.env },
-      });
-    } else {
-      // If tempDbPath doesn't exist, maybe the copy went directly to tempBackupPath
-      const files = await readdir(tempBackupPath);
-      for (const file of files) {
-        await rename(join(tempBackupPath, file), join(backupPath, file));
-      }
-      await execAsync(`rm -rf ${tempBackupPath}`, {
-        shell: "/bin/sh",
-        env: { ...process.env },
-      });
     }
     
     // Verify backup was created

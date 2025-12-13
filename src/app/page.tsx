@@ -59,7 +59,7 @@ export default function Home() {
         <Link href="/projects/new">
           <Button>New Project</Button>
         </Link>
-      </div>
+        </div>
 
       <div className="rounded-md border border-gray-200 bg-white">
         <Table>
@@ -110,7 +110,7 @@ export default function Home() {
             )}
           </TableBody>
         </Table>
-      </div>
+        </div>
     </div>
   );
 }
