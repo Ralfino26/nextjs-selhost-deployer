@@ -27,6 +27,15 @@ export interface ProjectDetails extends Project {
     memoryLimit?: number; // bytes
     uptime?: number; // seconds
     restartCount?: number;
+    networkRx?: number; // bytes received
+    networkTx?: number; // bytes transmitted
+  };
+  visitorStats?: {
+    activeConnections?: number; // Real-time active TCP connections
+    visitorsLastHour?: number; // Unique visitors in last hour (from NPM logs)
+    requestsLastHour?: number; // Total requests in last hour
+    visitorsToday?: number; // Unique visitors today
+    requestsToday?: number; // Total requests today
   };
   containerHealth?: "healthy" | "unhealthy" | "starting" | "none";
   volumeMounts?: Array<{

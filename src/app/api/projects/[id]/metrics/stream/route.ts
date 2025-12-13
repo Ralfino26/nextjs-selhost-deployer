@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 import { config } from "@/lib/config";
 import { getProjectStatus } from "@/lib/services/docker.service";
+import { getVisitorStats } from "@/lib/services/visitor.service";
 import { ProjectDetails } from "@/types/project";
 import { isAuthenticated } from "@/lib/auth";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 export async function GET(
   request: NextRequest,
@@ -15,6 +18,20 @@ export async function GET(
 
   const { id } = await params;
   const projectName = id;
+  
+  // Get port from docker-compose.yml
+  let port = 3000; // default
+  try {
+    const projectDir = join(config.projectsBaseDir, projectName);
+    const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+    const content = await readFile(dockerComposePath, "utf-8");
+    const portMatch = content.match(/ports:\s*-\s*"(\d+):/);
+    if (portMatch) {
+      port = parseInt(portMatch[1], 10);
+    }
+  } catch (error) {
+    // Port not found, use default
+  }
 
   // Create a readable stream for Server-Sent Events
   const stream = new ReadableStream({
@@ -83,6 +100,22 @@ export async function GET(
                   memoryLimit = statsData.memory_stats.limit || undefined;
                 }
 
+                // Get network stats
+                let networkRx: number | undefined;
+                let networkTx: number | undefined;
+                if (statsData.networks) {
+                  // Sum up all network interfaces
+                  let totalRx = 0;
+                  let totalTx = 0;
+                  for (const networkName in statsData.networks) {
+                    const network = statsData.networks[networkName];
+                    totalRx += network.rx_bytes || 0;
+                    totalTx += network.tx_bytes || 0;
+                  }
+                  networkRx = totalRx;
+                  networkTx = totalTx;
+                }
+
                 // Get uptime
                 let uptime: number | undefined;
                 if (info.State.StartedAt) {
@@ -96,6 +129,8 @@ export async function GET(
                   memoryLimit,
                   uptime,
                   restartCount: info.RestartCount || 0,
+                  networkRx,
+                  networkTx,
                 };
               } catch (error) {
                 // If stats fail, still include what we have
@@ -108,15 +143,32 @@ export async function GET(
                   };
                 }
               }
-            }
 
-            // Send updated metrics
-            sendData({
-              status,
-              containerMetrics,
-              containerHealth,
-              lastDeployment: info.State.StartedAt ? new Date(info.State.StartedAt).toLocaleString() : undefined,
-            });
+              // Get visitor stats (only every 5 seconds to reduce load)
+              let visitorStats: ProjectDetails["visitorStats"] | undefined;
+              try {
+                visitorStats = await getVisitorStats(projectName, port);
+              } catch (error) {
+                // Visitor stats failed, continue without them
+              }
+
+              // Send updated metrics
+              sendData({
+                status,
+                containerMetrics,
+                containerHealth,
+                visitorStats,
+                lastDeployment: info.State.StartedAt ? new Date(info.State.StartedAt).toLocaleString() : undefined,
+              });
+            } else {
+              // Container not running
+              sendData({
+                status,
+                visitorStats: {
+                  activeConnections: 0,
+                },
+              });
+            }
 
             // Wait 2 seconds before next update (real-time feel without heavy load)
             await new Promise((resolve) => setTimeout(resolve, 2000));

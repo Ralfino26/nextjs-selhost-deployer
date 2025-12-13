@@ -88,6 +88,7 @@ export default function ProjectDetailPage() {
                     status: data.status || prev.status,
                     containerMetrics: data.containerMetrics || prev.containerMetrics,
                     containerHealth: data.containerHealth || prev.containerHealth,
+                    visitorStats: data.visitorStats || prev.visitorStats,
                     lastDeployment: data.lastDeployment || prev.lastDeployment,
                   };
                 });
@@ -784,6 +785,72 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Visitor Statistics Card - Analytics Theme */}
+        {project.visitorStats && (
+          <div className="rounded-lg border-2 border-purple-500 bg-gradient-to-br from-purple-50 to-white p-5 shadow-lg">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500">
+                <span className="text-lg">👥</span>
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Visitor Statistics</h2>
+            </div>
+            <div className="space-y-3 text-sm">
+              {project.visitorStats.activeConnections !== undefined && (
+                <div className="rounded-md bg-purple-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-700">Active Connections</span>
+                    <span className="text-lg font-bold text-purple-700">
+                      {project.visitorStats.activeConnections}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Real-time active visitors</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                {project.visitorStats.visitorsLastHour !== undefined && (
+                  <div className="rounded-md bg-purple-50 p-3">
+                    <span className="text-xs font-medium text-gray-700">Visitors (Last Hour)</span>
+                    <p className="mt-1 text-lg font-semibold text-purple-700">
+                      {project.visitorStats.visitorsLastHour}
+                    </p>
+                  </div>
+                )}
+                {project.visitorStats.requestsLastHour !== undefined && (
+                  <div className="rounded-md bg-purple-50 p-3">
+                    <span className="text-xs font-medium text-gray-700">Requests (Last Hour)</span>
+                    <p className="mt-1 text-lg font-semibold text-purple-700">
+                      {project.visitorStats.requestsLastHour}
+                    </p>
+                  </div>
+                )}
+                {project.visitorStats.visitorsToday !== undefined && (
+                  <div className="rounded-md bg-purple-50 p-3">
+                    <span className="text-xs font-medium text-gray-700">Visitors (Today)</span>
+                    <p className="mt-1 text-lg font-semibold text-purple-700">
+                      {project.visitorStats.visitorsToday}
+                    </p>
+                  </div>
+                )}
+                {project.visitorStats.requestsToday !== undefined && (
+                  <div className="rounded-md bg-purple-50 p-3">
+                    <span className="text-xs font-medium text-gray-700">Requests (Today)</span>
+                    <p className="mt-1 text-lg font-semibold text-purple-700">
+                      {project.visitorStats.requestsToday}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {!project.visitorStats.activeConnections &&
+                !project.visitorStats.visitorsLastHour &&
+                !project.visitorStats.visitorsToday && (
+                  <p className="text-xs text-gray-500">
+                    Visitor statistics will appear here once data is available
+                  </p>
+                )}
+            </div>
+          </div>
+        )}
 
         {/* Database Information Card - MongoDB Theme */}
         {project.database && (
