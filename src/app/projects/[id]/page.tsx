@@ -14,6 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProjectDetails, EnvironmentVariable } from "@/types/project";
+import { toast } from "sonner";
+import { Copy, X, CheckCircle2, Loader2, Circle, ArrowUp, ArrowDown, Maximize2, ExternalLink } from "lucide-react";
 
 export default function ProjectDetailPage() {
   const router = useRouter();
@@ -33,6 +35,19 @@ export default function ProjectDetailPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showDeployLogs, setShowDeployLogs] = useState(false);
   const [deployLogs, setDeployLogs] = useState<string>("");
+  const [deployLogsByPhase, setDeployLogsByPhase] = useState<{
+    initializing: string[];
+    building: string[];
+    deploying: string[];
+    cleanup: string[];
+    postProcessing: string[];
+  }>({
+    initializing: [],
+    building: [],
+    deploying: [],
+    cleanup: [],
+    postProcessing: [],
+  });
   const [deployPhases, setDeployPhases] = useState<{
     initializing: "pending" | "active" | "complete";
     building: "pending" | "active" | "complete";
@@ -46,6 +61,7 @@ export default function ProjectDetailPage() {
     cleanup: "pending",
     postProcessing: "pending",
   });
+  const [isMaximized, setIsMaximized] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
@@ -1016,201 +1032,26 @@ export default function ProjectDetailPage() {
       </div>
 
 
-      {/* Deploy Logs Modal - Modern Professional Design */}
-      {showDeployLogs && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && actionLoading !== "deploy") {
-              setShowDeployLogs(false);
-              setDeployLogs("");
-              setDeployPhases({
-                initializing: "pending",
-                building: "pending",
-                deploying: "pending",
-                cleanup: "pending",
-                postProcessing: "pending",
-              });
-            }
-          }}
-        >
-          <div className="w-full max-w-6xl rounded-xl bg-white shadow-2xl border border-gray-200 max-h-[90vh] flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white px-6 py-4">
-              <div className="flex items-center gap-3">
-                {actionLoading === "deploy" ? (
-                  <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                )}
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Deploying {project?.name}</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {actionLoading === "deploy" ? "Deployment in progress..." : "Deployment completed"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {deployLogs && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(deployLogs);
-                        toast.success("Logs copied to clipboard");
-                      } catch (error) {
-                        toast.error("Failed to copy logs");
-                      }
-                    }}
-                    className="h-8 gap-2"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Copy logs
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowDeployLogs(false);
-                    setDeployLogs("");
-                    setDeployPhases({
-                      initializing: "pending",
-                      building: "pending",
-                      deploying: "pending",
-                      cleanup: "pending",
-                      postProcessing: "pending",
-                    });
-                  }}
-                  className="h-8 w-8 p-0"
-                  disabled={actionLoading === "deploy"}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Deployment Phases - Modern Design */}
-            <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
-              <div className="grid grid-cols-5 gap-4">
-                {[
-                  { key: "initializing", label: "Initializing" },
-                  { key: "building", label: "Building" },
-                  { key: "deploying", label: "Deploying" },
-                  { key: "cleanup", label: "Cleanup" },
-                  { key: "postProcessing", label: "Post-processing" },
-                ].map((phase) => {
-                  const phaseState = deployPhases[phase.key as keyof typeof deployPhases];
-                  return (
-                    <div key={phase.key} className="flex flex-col items-center gap-2">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                        phaseState === "complete" 
-                          ? "bg-green-500 text-white shadow-lg shadow-green-500/50" 
-                          : phaseState === "active"
-                          ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50 animate-pulse"
-                          : "bg-gray-200 text-gray-400"
-                      }`}>
-                        {phaseState === "complete" ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : phaseState === "active" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Circle className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <p className={`text-xs font-medium ${
-                          phaseState === "complete" 
-                            ? "text-green-600" 
-                            : phaseState === "active"
-                            ? "text-blue-600"
-                            : "text-gray-400"
-                        }`}>
-                          {phase.label}
-                        </p>
-                        {phaseState === "complete" && (
-                          <p className="text-[10px] text-green-600 mt-0.5">Complete</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Logs Container */}
-            <div className="bg-[#0d1117] p-6 flex-1 overflow-hidden flex flex-col">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs font-medium text-gray-300">Live deployment output</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {deployLogs && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const logElement = document.getElementById("deploy-logs");
-                          if (logElement) {
-                            logElement.scrollTop = logElement.scrollHeight;
-                          }
-                        }}
-                        className="text-xs text-gray-400 hover:text-gray-200 h-7"
-                      >
-                        Scroll to bottom
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="relative flex-1 overflow-hidden rounded-lg border border-gray-800 bg-black">
-                <pre
-                  id="deploy-logs"
-                  className="p-4 text-xs text-[#7ee787] font-mono whitespace-pre-wrap overflow-auto h-full leading-relaxed"
-                  style={{ 
-                    scrollBehavior: "smooth"
-                  }}
-                >
-                  {deployLogs || (
-                    <span className="text-gray-500">
-                      <span className="inline-block animate-pulse">▋</span> Initializing deployment...
-                    </span>
-                  )}
-                </pre>
-                {actionLoading === "deploy" && (
-                  <div className="absolute bottom-4 right-4 flex items-center gap-2 px-2 py-1 rounded bg-gray-900/80 border border-gray-800">
-                    <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                    <span className="text-xs text-gray-300">Streaming...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-gray-200 bg-gray-50 px-6 py-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">Project: <span className="font-medium">{project?.name}</span></span>
-                <div className="flex items-center gap-3">
-                  {actionLoading === "deploy" ? (
-                    <div className="flex items-center gap-2 text-xs text-blue-600">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span className="font-medium">In progress</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs text-green-600">
-                      <CheckCircle2 className="h-3 w-3" />
-                      <span className="font-medium">Completed</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Deploy Logs Modal - Netlify Style */}
+      <DeployModal
+        isOpen={showDeployLogs}
+        onClose={() => {
+          setShowDeployLogs(false);
+          setDeployLogs("");
+          setDeployPhases({
+            initializing: "pending",
+            building: "pending",
+            deploying: "pending",
+            cleanup: "pending",
+            postProcessing: "pending",
+          });
+        }}
+        projectName={project?.name || ""}
+        projectDomain={project?.domain}
+        deployLogs={deployLogs}
+        deployPhases={deployPhases}
+        isDeploying={actionLoading === "deploy"}
+      />
 
       <div className="mb-6 space-y-4">
         {/* Deployment Workflow */}
