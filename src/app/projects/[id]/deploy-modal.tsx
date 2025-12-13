@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ArrowUp, ArrowDown, Maximize2, ExternalLink, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,13 +32,6 @@ export function DeployModal({
 }: DeployModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(["building"]));
-  const [userCollapsedPhases, setUserCollapsedPhases] = useState<Set<string>>(new Set());
-  const userCollapsedPhasesRef = useRef<Set<string>>(new Set());
-  
-  // Keep ref in sync with state
-  useEffect(() => {
-    userCollapsedPhasesRef.current = userCollapsedPhases;
-  }, [userCollapsedPhases]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -107,44 +100,13 @@ export function DeployModal({
   const buildLogLines = formatLogsWithLineNumbers(buildLogs);
   const deployLogLines = formatLogsWithLineNumbers(deployPhaseLogs);
 
-  // Auto-expand phases when they become active (unless user explicitly collapsed them)
-  useEffect(() => {
-    setExpandedPhases((prev) => {
-      const next = new Set(prev);
-      let changed = false;
-      
-      // Auto-expand building phase if active and not user-collapsed
-      if (deployPhases.building === "active" && !userCollapsedPhasesRef.current.has("building") && !next.has("building")) {
-        next.add("building");
-        changed = true;
-      }
-      
-      // Auto-expand deploying phase if active and not user-collapsed
-      if (deployPhases.deploying === "active" && !userCollapsedPhasesRef.current.has("deploying") && !next.has("deploying")) {
-        next.add("deploying");
-        changed = true;
-      }
-      
-      // Only return new set if something changed to prevent unnecessary re-renders
-      return changed ? next : prev;
-    });
-  }, [deployPhases.building, deployPhases.deploying]);
-
   const togglePhase = (phaseKey: string) => {
     setExpandedPhases((prev) => {
       const next = new Set(prev);
       if (next.has(phaseKey)) {
         next.delete(phaseKey);
-        // Remember that user explicitly collapsed this phase
-        setUserCollapsedPhases((prev) => new Set(prev).add(phaseKey));
       } else {
         next.add(phaseKey);
-        // User expanded it, so remove from collapsed set
-        setUserCollapsedPhases((prev) => {
-          const next = new Set(prev);
-          next.delete(phaseKey);
-          return next;
-        });
       }
       return next;
     });
@@ -331,7 +293,7 @@ export function DeployModal({
             {(buildLogs.length > 0 || deployPhases.building !== "pending") && (
               <details
                 id="building"
-                open={expandedPhases.has("building")}
+                open={expandedPhases.has("building") || deployPhases.building === "active"}
                 className="border-t border-gray-800"
               >
                 <summary
@@ -401,7 +363,7 @@ export function DeployModal({
             {(deployPhaseLogs.length > 0 || deployPhases.deploying !== "pending") && (
               <details
                 id="deploying"
-                open={expandedPhases.has("deploying")}
+                open={expandedPhases.has("deploying") || deployPhases.deploying === "active"}
                 className="border-t border-gray-800"
               >
                 <summary
