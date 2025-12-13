@@ -32,6 +32,7 @@ export function DeployModal({
 }: DeployModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({
+    stopping: true,
     building: true,
     deploying: false,
   });
@@ -50,41 +51,49 @@ export function DeployModal({
   }, [isOpen]);
 
   // Split logs into phases - memoized
-  const { buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
+  const { stoppingLogs, buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
     const stopStartMarker = "🛑 Stopping containers";
+    const stopEndMarker = "✅ Containers stopped";
     const buildStartMarker = "🔨 Building images";
     const buildEndMarker = "✅ Build completed";
     const deployStartMarker = "🚀 Starting containers";
     const deployEndMarker = "✅ Deployment completed";
 
+    const stoppingLogsArray: string[] = [];
     const buildLogsArray: string[] = [];
     const deployLogsArray: string[] = [];
-    let currentPhase: "build" | "deploy" | null = null;
+    let currentPhase: "stopping" | "build" | "deploy" | null = null;
 
     const lines = deployLogs.split("\n");
     for (const line of lines) {
       if (line.includes(stopStartMarker) || line.includes("Stopping containers")) {
-        // Start of stopping phase, which is part of building phase
-        currentPhase = "build";
-        buildLogsArray.push(line);
+        currentPhase = "stopping";
+        stoppingLogsArray.push(line);
+      } else if (line.includes(stopEndMarker) || line.includes("Containers stopped")) {
+        if (currentPhase === "stopping") {
+          stoppingLogsArray.push(line);
+        }
+        currentPhase = null;
       } else if (line.includes(buildStartMarker) || line.includes("🔨 Starting build") || line.includes("Building images")) {
         currentPhase = "build";
         buildLogsArray.push(line);
-      } else if (line.includes(buildEndMarker)) {
+      } else if (line.includes(buildEndMarker) || line.includes("Build completed")) {
         if (currentPhase === "build") {
           buildLogsArray.push(line);
         }
         currentPhase = null;
-      } else if (line.includes(deployStartMarker)) {
+      } else if (line.includes(deployStartMarker) || line.includes("Starting containers")) {
         currentPhase = "deploy";
         deployLogsArray.push(line);
-      } else if (line.includes(deployEndMarker)) {
+      } else if (line.includes(deployEndMarker) || line.includes("Deployment completed")) {
         if (currentPhase === "deploy") {
           deployLogsArray.push(line);
         }
         currentPhase = null;
       } else {
-        if (currentPhase === "build") {
+        if (currentPhase === "stopping") {
+          stoppingLogsArray.push(line);
+        } else if (currentPhase === "build") {
           buildLogsArray.push(line);
         } else if (currentPhase === "deploy") {
           deployLogsArray.push(line);
@@ -92,10 +101,17 @@ export function DeployModal({
       }
     }
 
-    return { buildLogs: buildLogsArray, deployLogs: deployLogsArray };
+    return { stoppingLogs: stoppingLogsArray, buildLogs: buildLogsArray, deployLogs: deployLogsArray };
   }, [deployLogs]);
 
   // Format logs with line numbers - memoized
+  const stoppingLogLines = useMemo(() => {
+    return stoppingLogs.map((line, index) => ({
+      number: index + 1,
+      content: line,
+    }));
+  }, [stoppingLogs]);
+
   const buildLogLines = useMemo(() => {
     return buildLogs.map((line, index) => ({
       number: index + 1,
@@ -316,6 +332,85 @@ export function DeployModal({
               WebkitOverflowScrolling: "touch"
             }}
           >
+            {/* Stopping Phase */}
+            {(stoppingLogs.length > 0 || deployPhases.building === "active") && (
+              <div className="border-b border-gray-700">
+                {/* Phase Header - Always clickable */}
+                <button
+                  onClick={() => togglePhase("stopping")}
+                  className="w-full relative bg-gray-800 hover:bg-gray-700 text-left transition-colors duration-150"
+                >
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {expandedPhases.stopping ? (
+                        <ChevronDown className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      )}
+                      <h3 className="font-semibold text-base text-white">Stopping</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {stoppingLogs.length > 0 && stoppingLogs.some(line => line.includes("✅ Containers stopped") || line.includes("Containers stopped")) && (
+                        <span className="flex items-center gap-2 text-green-400">
+                          <CheckCircle2 className="h-5 w-5" />
+                          <span className="text-xs font-medium bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full border border-green-700">
+                            Complete
+                          </span>
+                        </span>
+                      )}
+                      {stoppingLogs.length > 0 && !stoppingLogs.some(line => line.includes("✅ Containers stopped") || line.includes("Containers stopped")) && (
+                        <span className="flex items-center gap-2 text-blue-400">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span className="text-xs font-medium bg-blue-900/30 text-blue-400 px-3 py-1.5 rounded-full border border-blue-700">
+                            In progress
+                          </span>
+                        </span>
+                      )}
+                      {stoppingLogs.length > 0 && (
+                        <span className="text-xs text-gray-400 font-mono bg-gray-700/50 px-2 py-1 rounded">
+                          {stoppingLogs.length} lines
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                
+                {/* Phase Content - Collapsible */}
+                {expandedPhases.stopping && (
+                  <div className="bg-black border-t border-gray-800">
+                    <div className="font-mono text-sm text-gray-100 antialiased p-6 pr-0">
+                      {stoppingLogLines.length > 0 ? (
+                        <div className="space-y-0">
+                          {stoppingLogLines.map((line, idx) => (
+                            <div
+                              key={idx}
+                              id={`stopping-L${line.number}`}
+                              className="relative pl-16 hover:bg-gray-900/50 min-h-[1.5rem] group transition-colors"
+                            >
+                              <div
+                                className="absolute left-0 top-0 h-full min-w-[4rem] text-right pr-4 text-gray-600 group-hover:text-gray-400 cursor-pointer select-none leading-[1.5rem] font-normal"
+                                data-line-number={line.number}
+                              >
+                                {line.number}
+                              </div>
+                              <div className="border-l border-gray-800 group-hover:border-gray-700 break-words pl-6 pr-4 leading-[1.5rem] whitespace-pre-wrap text-gray-200">
+                                {line.content || " "}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 pl-16 flex items-center gap-2">
+                          <span className="inline-block animate-pulse">▋</span>
+                          <span>Waiting for stopping logs...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Building Phase */}
             {(buildLogs.length > 0 || deployPhases.building !== "pending") && (
               <div className="border-b border-gray-700">
