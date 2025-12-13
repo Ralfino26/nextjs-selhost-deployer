@@ -310,6 +310,12 @@ export default function ProjectDetailPage() {
                 <p className="mt-0.5 text-green-600">✓ Enabled</p>
               </div>
             )}
+            {project.lastDeployment && (
+              <div>
+                <span className="font-medium text-gray-600">Last Deployment:</span>
+                <p className="mt-0.5 text-xs text-gray-900">{project.lastDeployment}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -335,6 +341,24 @@ export default function ProjectDetailPage() {
                   <div>
                     <span className="font-medium text-gray-600">Commit:</span>
                     <p className="mt-0.5 font-mono text-xs text-gray-900">{project.gitCommit}</p>
+                  </div>
+                )}
+                {project.gitCommitMessage && (
+                  <div>
+                    <span className="font-medium text-gray-600">Message:</span>
+                    <p className="mt-0.5 text-xs text-gray-900">{project.gitCommitMessage}</p>
+                  </div>
+                )}
+                {project.gitCommitAuthor && (
+                  <div>
+                    <span className="font-medium text-gray-600">Author:</span>
+                    <p className="mt-0.5 text-xs text-gray-900">{project.gitCommitAuthor}</p>
+                  </div>
+                )}
+                {project.gitCommitDate && (
+                  <div>
+                    <span className="font-medium text-gray-600">Date:</span>
+                    <p className="mt-0.5 text-xs text-gray-900">{project.gitCommitDate}</p>
                   </div>
                 )}
               </>
@@ -379,6 +403,81 @@ export default function ProjectDetailPage() {
                         >
                           {network}
                         </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {project.containerHealth && project.containerHealth !== "none" && (
+                  <div>
+                    <span className="font-medium text-gray-600">Health:</span>
+                    <div className="mt-0.5">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                          project.containerHealth === "healthy"
+                            ? "bg-green-100 text-green-800"
+                            : project.containerHealth === "starting"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {project.containerHealth}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {project.containerMetrics && (
+                  <>
+                    {project.containerMetrics.cpuUsage !== undefined && (
+                      <div>
+                        <span className="font-medium text-gray-600">CPU Usage:</span>
+                        <p className="mt-0.5 text-xs text-gray-900">
+                          {project.containerMetrics.cpuUsage.toFixed(2)}%
+                        </p>
+                      </div>
+                    )}
+                    {project.containerMetrics.memoryUsage !== undefined && (
+                      <div>
+                        <span className="font-medium text-gray-600">Memory:</span>
+                        <p className="mt-0.5 text-xs text-gray-900">
+                          {project.containerMetrics.memoryLimit
+                            ? `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB / ${(project.containerMetrics.memoryLimit / 1024 / 1024).toFixed(2)} MB (${((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100).toFixed(1)}%)`
+                            : `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB`}
+                        </p>
+                      </div>
+                    )}
+                    {project.containerMetrics.uptime !== undefined && (
+                      <div>
+                        <span className="font-medium text-gray-600">Uptime:</span>
+                        <p className="mt-0.5 text-xs text-gray-900">
+                          {project.containerMetrics.uptime >= 86400
+                            ? `${Math.floor(project.containerMetrics.uptime / 86400)}d ${Math.floor((project.containerMetrics.uptime % 86400) / 3600)}h`
+                            : project.containerMetrics.uptime >= 3600
+                            ? `${Math.floor(project.containerMetrics.uptime / 3600)}h ${Math.floor((project.containerMetrics.uptime % 3600) / 60)}m`
+                            : `${Math.floor(project.containerMetrics.uptime / 60)}m ${project.containerMetrics.uptime % 60}s`}
+                        </p>
+                      </div>
+                    )}
+                    {project.containerMetrics.restartCount !== undefined && (
+                      <div>
+                        <span className="font-medium text-gray-600">Restart Count:</span>
+                        <p className="mt-0.5 text-xs text-gray-900">
+                          {project.containerMetrics.restartCount}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+                {project.volumeMounts && project.volumeMounts.length > 0 && (
+                  <div>
+                    <span className="font-medium text-gray-600">Volume Mounts:</span>
+                    <div className="mt-0.5 space-y-1">
+                      {project.volumeMounts.map((mount, index) => (
+                        <div key={index} className="text-xs">
+                          <p className="font-mono text-gray-900 break-all">
+                            {mount.source} → {mount.destination}
+                          </p>
+                          <p className="text-gray-500 text-[10px]">({mount.type})</p>
+                        </div>
                       ))}
                     </div>
                   </div>

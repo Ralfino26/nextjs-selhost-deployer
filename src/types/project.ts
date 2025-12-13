@@ -14,10 +14,26 @@ export interface ProjectDetails extends Project {
   gitRemote?: string;
   gitBranch?: string;
   gitCommit?: string;
+  gitCommitMessage?: string;
+  gitCommitAuthor?: string;
+  gitCommitDate?: string;
   containerId?: string;
   containerImage?: string;
   containerCreated?: string;
   containerNetworks?: string[];
+  containerMetrics?: {
+    cpuUsage?: number; // percentage
+    memoryUsage?: number; // bytes
+    memoryLimit?: number; // bytes
+    uptime?: number; // seconds
+    restartCount?: number;
+  };
+  containerHealth?: "healthy" | "unhealthy" | "starting" | "none";
+  volumeMounts?: Array<{
+    source: string;
+    destination: string;
+    type: string;
+  }>;
   dockerComposePath?: string;
   repoPath?: string;
   database?: {
