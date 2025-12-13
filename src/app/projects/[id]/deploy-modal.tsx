@@ -114,9 +114,16 @@ export function DeployModal({
 
   const handleCopyLogs = async () => {
     try {
-      await navigator.clipboard.writeText(deployLogs);
+      // Copy all logs (both build and deploy)
+      const allLogs = deployLogs || "";
+      if (!allLogs) {
+        toast.error("No logs to copy");
+        return;
+      }
+      await navigator.clipboard.writeText(allLogs);
       toast.success("Logs copied to clipboard");
     } catch (error) {
+      console.error("Failed to copy logs:", error);
       toast.error("Failed to copy logs");
     }
   };
@@ -157,11 +164,15 @@ export function DeployModal({
       }}
     >
       <div
-        className={`bg-white shadow-2xl border border-gray-200 flex flex-col overflow-hidden transition-all ${
+        className={`bg-white shadow-2xl border border-gray-200 flex flex-col transition-all ${
           isMaximized
             ? "w-full h-full rounded-none"
-            : "w-full max-w-6xl max-h-[90vh] rounded-xl"
+            : "w-full max-w-6xl h-[90vh] rounded-xl"
         }`}
+        onClick={(e) => {
+          // Prevent clicks inside modal from closing it
+          e.stopPropagation();
+        }}
       >
         {/* Header Toolbar */}
         <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between flex-wrap gap-4">
@@ -221,17 +232,16 @@ export function DeployModal({
 
         {/* Logs Container with Collapsible Sections */}
         <div 
-          className="flex-1 min-h-0 bg-black overflow-hidden" 
+          className="flex-1 min-h-0 bg-black overflow-hidden flex flex-col" 
           id="deploy-logs-container"
         >
           <div 
-            className="h-full overflow-y-auto"
+            className="flex-1 overflow-y-auto min-h-0"
             onWheel={(e) => {
               // Stop wheel events from propagating to body
               e.stopPropagation();
             }}
             style={{ 
-              maxHeight: "100%",
               overscrollBehavior: "contain"
             }}
           >
