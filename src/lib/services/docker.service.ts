@@ -6,7 +6,7 @@ import { config } from "../config";
 const execAsync = promisify(exec);
 
 // Dynamically import dockerode to avoid build issues
-async function getDocker() {
+export async function getDocker() {
   const Docker = (await import("dockerode")).default;
   return new Docker();
 }

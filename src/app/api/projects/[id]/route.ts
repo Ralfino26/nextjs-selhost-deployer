@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
 import { config } from "@/lib/config";
 import { getProjectStatus } from "@/lib/services/docker.service";
-import { Project } from "@/types/project";
+import { ProjectDetails } from "@/types/project";
+
+const execAsync = promisify(exec);
 
 // GET /api/projects/[id] - Get a single project
 export async function GET(
@@ -56,7 +60,57 @@ export async function GET(
       // Get status regardless of domain
       const status = await getProjectStatus(projectName);
 
-      const project: Project = {
+      const repoPath = join(projectDir, repoDir.name);
+      const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
+
+      // Get Git information
+      let gitRemote: string | undefined;
+      let gitBranch: string | undefined;
+      let gitCommit: string | undefined;
+      
+      try {
+        const gitRemoteResult = await execAsync("git config --get remote.origin.url", {
+          cwd: repoPath,
+          shell: "/bin/sh"
+        }).catch(() => ({ stdout: "" }));
+        gitRemote = gitRemoteResult.stdout.trim() || undefined;
+
+        const gitBranchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
+          cwd: repoPath,
+          shell: "/bin/sh"
+        }).catch(() => ({ stdout: "" }));
+        gitBranch = gitBranchResult.stdout.trim() || undefined;
+
+        const gitCommitResult = await execAsync("git rev-parse --short HEAD", {
+          cwd: repoPath,
+          shell: "/bin/sh"
+        }).catch(() => ({ stdout: "" }));
+        gitCommit = gitCommitResult.stdout.trim() || undefined;
+      } catch (error) {
+        console.warn(`Failed to get git info for ${projectName}:`, error);
+      }
+
+      // Get Docker container information
+      let containerId: string | undefined;
+      let containerImage: string | undefined;
+      let containerCreated: string | undefined;
+      let containerNetworks: string[] | undefined;
+
+      try {
+        const { getDocker } = await import("@/lib/services/docker.service");
+        const docker = await getDocker();
+        const container = docker.getContainer(projectName);
+        const info = await container.inspect();
+        
+        containerId = info.Id.substring(0, 12); // Short ID
+        containerImage = info.Config?.Image;
+        containerCreated = info.Created ? new Date(info.Created).toLocaleString() : undefined;
+        containerNetworks = Object.keys(info.NetworkSettings?.Networks || {});
+      } catch (error) {
+        console.warn(`Failed to get container info for ${projectName}:`, error);
+      }
+
+      const project: ProjectDetails = {
         id: projectName,
         name: projectName,
         repo: repoDir.name,
@@ -65,6 +119,15 @@ export async function GET(
         createDatabase: hasDatabase,
         status,
         directory: projectDir,
+        gitRemote,
+        gitBranch,
+        gitCommit,
+        containerId,
+        containerImage,
+        containerCreated,
+        containerNetworks,
+        dockerComposePath,
+        repoPath,
       };
 
       return NextResponse.json(project);

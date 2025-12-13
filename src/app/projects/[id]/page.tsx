@@ -13,13 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Project, EnvironmentVariable } from "@/types/project";
+import { ProjectDetails, EnvironmentVariable } from "@/types/project";
 
 export default function ProjectDetailPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState("");
   const [envVariables, setEnvVariables] = useState<EnvironmentVariable[]>([]);
@@ -255,43 +255,167 @@ export default function ProjectDetailPage() {
         </Link>
       </div>
 
-      <div className="mb-6">
-        <h1 className="mb-2 text-2xl font-semibold">{project.name}</h1>
-        <div className="space-y-2 text-sm text-gray-900">
-          <div>
-            <span className="font-medium">Domain: </span>
-            <a
-              href={`https://${project.domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              {project.domain}
-            </a>
+      {/* Project Overview Cards */}
+      <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Project Info Card */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">Project Information</h2>
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-medium text-gray-600">Name:</span>
+              <p className="mt-0.5 text-gray-900">{project.name}</p>
+            </div>
+            <div>
+              <span className="font-medium text-gray-600">Status:</span>
+              <div className="mt-0.5">
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                    project.status === "Running"
+                      ? "bg-green-100 text-green-800"
+                      : project.status === "Building"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : project.status === "Error"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {project.status}
+                </span>
+              </div>
+            </div>
+            <div>
+              <span className="font-medium text-gray-600">Port:</span>
+              <p className="mt-0.5 font-mono text-gray-900">{project.port}</p>
+            </div>
+            <div>
+              <span className="font-medium text-gray-600">Domain:</span>
+              <p className="mt-0.5">
+                {project.domain.startsWith("ERROR") ? (
+                  <span className="text-red-600">{project.domain}</span>
+                ) : (
+                  <a
+                    href={`https://${project.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    {project.domain}
+                  </a>
+                )}
+              </p>
+            </div>
+            {project.createDatabase && (
+              <div>
+                <span className="font-medium text-gray-600">Database:</span>
+                <p className="mt-0.5 text-green-600">✓ Enabled</p>
+              </div>
+            )}
           </div>
-          <div>
-            <span className="font-medium">Status: </span>
-            <span
-              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                project.status === "Running"
-                  ? "bg-green-100 text-green-800"
-                  : project.status === "Building"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : project.status === "Error"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-gray-100 text-gray-800"
-              }`}
-            >
-              {project.status}
-            </span>
+        </div>
+
+        {/* Git Information Card */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">Git Repository</h2>
+          <div className="space-y-2 text-sm">
+            {project.gitRemote ? (
+              <>
+                <div>
+                  <span className="font-medium text-gray-600">Remote:</span>
+                  <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                    {project.gitRemote.replace(/https?:\/\/[^@]+@/, "https://***@")}
+                  </p>
+                </div>
+                {project.gitBranch && (
+                  <div>
+                    <span className="font-medium text-gray-600">Branch:</span>
+                    <p className="mt-0.5 font-mono text-gray-900">{project.gitBranch}</p>
+                  </div>
+                )}
+                {project.gitCommit && (
+                  <div>
+                    <span className="font-medium text-gray-600">Commit:</span>
+                    <p className="mt-0.5 font-mono text-xs text-gray-900">{project.gitCommit}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-gray-500">No git information available</p>
+            )}
           </div>
-          <div>
-            <span className="font-medium">Port: </span>
-            {project.port}
+        </div>
+
+        {/* Docker Container Card */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">Docker Container</h2>
+          <div className="space-y-2 text-sm">
+            {project.containerId ? (
+              <>
+                <div>
+                  <span className="font-medium text-gray-600">Container ID:</span>
+                  <p className="mt-0.5 font-mono text-xs text-gray-900">{project.containerId}</p>
+                </div>
+                {project.containerImage && (
+                  <div>
+                    <span className="font-medium text-gray-600">Image:</span>
+                    <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                      {project.containerImage}
+                    </p>
+                  </div>
+                )}
+                {project.containerCreated && (
+                  <div>
+                    <span className="font-medium text-gray-600">Created:</span>
+                    <p className="mt-0.5 text-xs text-gray-900">{project.containerCreated}</p>
+                  </div>
+                )}
+                {project.containerNetworks && project.containerNetworks.length > 0 && (
+                  <div>
+                    <span className="font-medium text-gray-600">Networks:</span>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {project.containerNetworks.map((network) => (
+                        <span
+                          key={network}
+                          className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-mono text-blue-700"
+                        >
+                          {network}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-gray-500">Container not found or not running</p>
+            )}
           </div>
-          <div>
-            <span className="font-medium">Repository: </span>
-            {project.repo}
+        </div>
+
+        {/* File Paths Card */}
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">File Paths</h2>
+          <div className="space-y-2 text-sm">
+            {project.repoPath && (
+              <div>
+                <span className="font-medium text-gray-600">Repository:</span>
+                <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                  {project.repoPath}
+                </p>
+              </div>
+            )}
+            {project.dockerComposePath && (
+              <div>
+                <span className="font-medium text-gray-600">Docker Compose:</span>
+                <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                  {project.dockerComposePath}
+                </p>
+              </div>
+            )}
+            <div>
+              <span className="font-medium text-gray-600">Project Directory:</span>
+              <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                {project.directory}
+              </p>
+            </div>
           </div>
         </div>
       </div>

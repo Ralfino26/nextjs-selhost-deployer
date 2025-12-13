@@ -10,6 +10,18 @@ export interface Project {
   directory: string;
 }
 
+export interface ProjectDetails extends Project {
+  gitRemote?: string;
+  gitBranch?: string;
+  gitCommit?: string;
+  containerId?: string;
+  containerImage?: string;
+  containerCreated?: string;
+  containerNetworks?: string[];
+  dockerComposePath?: string;
+  repoPath?: string;
+}
+
 export interface CreateProjectRequest {
   repo: string;
   projectName: string;
