@@ -61,7 +61,6 @@ export async function GET(
       const status = await getProjectStatus(projectName);
 
       const repoPath = join(projectDir, repoDir.name);
-      const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
       // Get Git information
       let gitRemote: string | undefined;
