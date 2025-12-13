@@ -29,7 +29,6 @@ export default function ProjectDetailPage() {
   const [deployLogs, setDeployLogs] = useState<string>("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [metricsStream, setMetricsStream] = useState<EventSource | null>(null);
 
   useEffect(() => {
     fetchProject();
@@ -40,48 +39,39 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     // Only stream if enabled, project is loaded and no actions are in progress
     if (!autoRefresh || !project || actionLoading !== null || loading) {
-      if (metricsStream) {
-        metricsStream.close();
-        setMetricsStream(null);
-      }
       return;
     }
 
-    const auth = sessionStorage.getItem("auth");
-    const authHeader = auth ? `Basic ${auth}` : "";
-
-    // Create EventSource for real-time metrics
-    const eventSource = new EventSource(`/api/projects/${projectId}/metrics/stream`, {
-      withCredentials: false,
-    });
-
-    // Note: EventSource doesn't support custom headers, so we'll need to handle auth differently
-    // For now, we'll use a workaround with a query parameter or handle it server-side
-    // Actually, let's use fetch with ReadableStream instead
+    let isActive = true;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
     const connectStream = async () => {
       try {
+        const auth = sessionStorage.getItem("auth");
         const response = await fetch(`/api/projects/${projectId}/metrics/stream`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
+          headers: auth ? { Authorization: `Basic ${auth}` } : {},
         });
 
         if (!response.ok) {
           throw new Error("Failed to connect to metrics stream");
         }
 
-        const reader = response.body?.getReader();
+        reader = response.body?.getReader();
         const decoder = new TextDecoder();
 
         if (!reader) {
           throw new Error("No response body");
         }
 
-        while (autoRefresh && project && actionLoading === null) {
+        let buffer = "";
+
+        while (isActive && autoRefresh && project && actionLoading === null) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
@@ -105,25 +95,25 @@ export default function ProjectDetailPage() {
             }
           }
         }
-
-        reader.cancel();
       } catch (error) {
         console.error("Error in metrics stream:", error);
-        // Fallback to polling if SSE fails
-        const interval = setInterval(() => {
-          if (autoRefresh && project && actionLoading === null) {
-            fetchProject(true);
-          }
-        }, 2000);
-        return () => clearInterval(interval);
+        // Silently reconnect after a delay
+        if (isActive && autoRefresh) {
+          setTimeout(() => {
+            if (isActive && autoRefresh) {
+              connectStream();
+            }
+          }, 3000);
+        }
       }
     };
 
     connectStream();
 
     return () => {
-      if (metricsStream) {
-        metricsStream.close();
+      isActive = false;
+      if (reader) {
+        reader.cancel().catch(() => {});
       }
     };
   }, [autoRefresh, project, actionLoading, loading, projectId]);
