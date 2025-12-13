@@ -217,18 +217,18 @@ export function DeployModal({
         <div 
           className="flex-1 min-h-0 bg-black overflow-hidden" 
           id="deploy-logs-container"
-          onWheel={(e) => {
-            // Stop wheel events from propagating to body
-            e.stopPropagation();
-            const container = e.currentTarget.querySelector(".overflow-y-auto") as HTMLElement;
-            if (container) {
-              const delta = e.deltaY;
-              container.scrollTop += delta;
-              e.preventDefault();
-            }
-          }}
         >
-          <div className="h-full overflow-y-auto" style={{ maxHeight: "100%" }}>
+          <div 
+            className="h-full overflow-y-auto"
+            onWheel={(e) => {
+              // Stop wheel events from propagating to body
+              e.stopPropagation();
+            }}
+            style={{ 
+              maxHeight: "100%",
+              overscrollBehavior: "contain"
+            }}
+          >
             {/* Building Phase */}
             {(buildLogs.length > 0 || deployPhases.building !== "pending") && (
               <details
