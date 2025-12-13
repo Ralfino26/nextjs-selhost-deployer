@@ -140,6 +140,10 @@ export async function writeDatabaseCompose(
   const databaseDir = join(projectDir, "database");
   await mkdir(databaseDir, { recursive: true });
 
+  // Get next available database port
+  const { getNextAvailableDatabasePort } = await import("./port.service");
+  const databasePort = await getNextAvailableDatabasePort();
+
   const dockerComposePath = join(databaseDir, "docker-compose.yml");
   
   // MongoDB compose as per your workflow
@@ -155,7 +159,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${config.database.password}
       MONGO_INITDB_DATABASE: ${dbName}
     ports:
-      - "27027:27017"
+      - "${databasePort}:27017"
     volumes:
       - ./data:/data/db
 `;
