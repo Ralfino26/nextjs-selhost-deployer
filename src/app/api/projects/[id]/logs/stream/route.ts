@@ -47,9 +47,14 @@ export async function GET(
           let logOutput = initialLogs.toString("utf-8");
           logOutput = logOutput.replace(/\x1b\[[0-9;]*m/g, ""); // Remove ANSI codes
           
-          // Send initial logs
-          if (logOutput) {
-            sendLog(logOutput);
+          // Docker logs returns oldest first, but we want newest at the bottom
+          // Split by lines and take the last 100 lines
+          const lines = logOutput.split("\n");
+          const lastLines = lines.slice(-100).join("\n");
+          
+          // Send initial logs (already in correct order - newest at end)
+          if (lastLines) {
+            sendLog(lastLines);
           }
         } catch (error) {
           // If container doesn't exist, try docker compose logs
@@ -69,8 +74,11 @@ export async function GET(
             );
 
             const logOutput = (result.stdout || result.stderr || "").replace(/\x1b\[[0-9;]*m/g, "");
-            if (logOutput) {
-              sendLog(logOutput);
+            // docker compose logs also returns oldest first, so take last lines
+            const lines = logOutput.split("\n");
+            const lastLines = lines.slice(-100).join("\n");
+            if (lastLines) {
+              sendLog(lastLines);
             }
           } catch (composeError) {
             sendLog("No logs available");
@@ -79,8 +87,8 @@ export async function GET(
 
         // Now stream new logs in real-time using polling (more reliable than Docker stream)
         if (isActive) {
-          let lastLogSize = 0;
-          let lastLogHash = "";
+          let lastLogLines: string[] = [];
+          let lastLineCount = 0;
 
           const pollLogs = async () => {
             if (!isActive) return;
@@ -93,24 +101,28 @@ export async function GET(
                 timestamps: false,
               });
 
-              const logOutput = logs.toString("utf-8").replace(/\x1b\[[0-9;]*m/g, "");
-              const currentSize = logOutput.length;
-              const currentHash = logOutput.slice(-1000); // Hash of last 1000 chars
+              let logOutput = logs.toString("utf-8").replace(/\x1b\[[0-9;]*m/g, "");
+              const lines = logOutput.split("\n").filter(line => line.trim() !== "");
+              const currentLineCount = lines.length;
 
-              // Only send if logs have changed
-              if (currentSize > lastLogSize || currentHash !== lastLogHash) {
-                if (lastLogSize === 0) {
-                  // First time, send all logs
-                  sendLog(logOutput);
+              // Only send if we have new lines
+              if (currentLineCount > lastLineCount) {
+                if (lastLineCount === 0) {
+                  // First time, send all logs (newest at end)
+                  sendLog(lines.join("\n") + "\n");
                 } else {
-                  // Send only new logs
-                  const newLogs = logOutput.slice(lastLogSize);
-                  if (newLogs) {
-                    sendLog(newLogs);
+                  // Send only new lines (the ones that were added)
+                  const newLines = lines.slice(lastLineCount);
+                  if (newLines.length > 0) {
+                    sendLog(newLines.join("\n") + "\n");
                   }
                 }
-                lastLogSize = currentSize;
-                lastLogHash = currentHash;
+                lastLogLines = lines;
+                lastLineCount = currentLineCount;
+              } else if (currentLineCount < lastLineCount) {
+                // Logs were cleared or container restarted, reset
+                lastLineCount = 0;
+                lastLogLines = [];
               }
             } catch (error) {
               // If container doesn't exist, try docker compose logs
@@ -129,25 +141,28 @@ export async function GET(
                   { cwd: dockerComposeDir }
                 );
 
-                const logOutput = (result.stdout || result.stderr || "").replace(/\x1b\[[0-9;]*m/g, "");
-                const currentSize = logOutput.length;
-                const currentHash = logOutput.slice(-1000);
+                let logOutput = (result.stdout || result.stderr || "").replace(/\x1b\[[0-9;]*m/g, "");
+                const lines = logOutput.split("\n").filter(line => line.trim() !== "");
+                const currentLineCount = lines.length;
 
-                if (currentSize > lastLogSize || currentHash !== lastLogHash) {
-                  if (lastLogSize === 0) {
-                    sendLog(logOutput);
+                if (currentLineCount > lastLineCount) {
+                  if (lastLineCount === 0) {
+                    sendLog(lines.join("\n") + "\n");
                   } else {
-                    const newLogs = logOutput.slice(lastLogSize);
-                    if (newLogs) {
-                      sendLog(newLogs);
+                    const newLines = lines.slice(lastLineCount);
+                    if (newLines.length > 0) {
+                      sendLog(newLines.join("\n") + "\n");
                     }
                   }
-                  lastLogSize = currentSize;
-                  lastLogHash = currentHash;
+                  lastLogLines = lines;
+                  lastLineCount = currentLineCount;
+                } else if (currentLineCount < lastLineCount) {
+                  lastLineCount = 0;
+                  lastLogLines = [];
                 }
               } catch (composeError) {
                 // Container might be stopped
-                if (lastLogSize === 0) {
+                if (lastLineCount === 0) {
                   sendLog("Container is not running or logs are not available");
                 }
               }
