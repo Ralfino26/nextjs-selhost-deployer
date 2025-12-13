@@ -72,19 +72,24 @@ export async function POST(
       }
       
       // Clean up the repo path - remove any remaining github.com prefix
-      repoPathFromUrl = repoPathFromUrl.trim().replace(/^github\.com\//, "");
+      repoPathFromUrl = repoPathFromUrl.trim();
+      // Remove any github.com/ prefix that might have been left (handle double prefix)
+      while (repoPathFromUrl.startsWith("github.com/")) {
+        repoPathFromUrl = repoPathFromUrl.replace(/^github\.com\//, "");
+      }
       
-      if (!repoPathFromUrl || repoPathFromUrl.includes("github.com")) {
-        console.error("Invalid repo path extracted:", repoPathFromUrl, "from:", remoteUrl);
+      // Validate: should be in format "owner/repo" without github.com
+      if (!repoPathFromUrl || repoPathFromUrl.includes("github.com") || !repoPathFromUrl.includes("/")) {
+        console.error("Invalid repo path extracted:", repoPathFromUrl, "from original URL:", remoteUrl);
         return NextResponse.json(
-          { error: `Could not extract repository path from remote URL: ${remoteUrl}` },
+          { error: `Could not extract valid repository path from remote URL: ${remoteUrl}. Extracted: ${repoPathFromUrl}` },
           { status: 400 }
         );
       }
 
       // Update remote URL with token
       const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
-      console.log(`Updating remote URL to: https://***@github.com/${repoPathFromUrl}.git`);
+      console.log(`Updating remote URL from: ${remoteUrl} to: https://***@github.com/${repoPathFromUrl}.git`);
       
       try {
         await execAsync(`git remote set-url origin "${newUrl}"`, { 
