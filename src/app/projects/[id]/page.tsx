@@ -43,7 +43,7 @@ export default function ProjectDetailPage() {
     }
 
     let isActive = true;
-    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null | undefined = null;
 
     const connectStream = async () => {
       try {
@@ -56,12 +56,14 @@ export default function ProjectDetailPage() {
           throw new Error("Failed to connect to metrics stream");
         }
 
-        reader = response.body?.getReader();
+        const streamReader = response.body?.getReader();
         const decoder = new TextDecoder();
 
-        if (!reader) {
+        if (!streamReader) {
           throw new Error("No response body");
         }
+
+        reader = streamReader;
 
         let buffer = "";
 
