@@ -58,56 +58,98 @@ async function getDatabaseConfig(projectName: string): Promise<{
  * @returns Path to the backup directory
  */
 export async function createMongoBackup(projectName: string): Promise<string> {
+  console.log(`[BACKUP] Starting backup for project: ${projectName}`);
+  
   const dbContainerName = `${projectName}-mongo`;
+  console.log(`[BACKUP] Database container name: ${dbContainerName}`);
+  
   const backupBaseDir = config.backupBaseDir || "/srv/vps/backups";
+  console.log(`[BACKUP] Backup base directory from config: ${backupBaseDir}`);
   
   if (!backupBaseDir) {
     throw new Error("Backup base directory not configured. Please set it in Settings.");
   }
   
   // Get database configuration from docker-compose.yml
+  console.log(`[BACKUP] Reading database configuration from docker-compose.yml...`);
   const dbConfig = await getDatabaseConfig(projectName);
   const { databaseName, username: mongoUser, password: mongoPassword } = dbConfig;
+  console.log(`[BACKUP] Database config - Name: ${databaseName}, User: ${mongoUser}, Password: ${mongoPassword ? "***" : "NOT SET"}`);
   
   // Ensure backup directory exists
+  console.log(`[BACKUP] Creating backup base directory: ${backupBaseDir}`);
   await mkdir(backupBaseDir, { recursive: true });
+  
+  if (!existsSync(backupBaseDir)) {
+    throw new Error(`Failed to create backup base directory: ${backupBaseDir}`);
+  }
+  console.log(`[BACKUP] ✓ Backup base directory exists: ${backupBaseDir}`);
   
   // Create project-specific backup directory
   const projectBackupDir = join(backupBaseDir, projectName);
+  console.log(`[BACKUP] Creating project backup directory: ${projectBackupDir}`);
   await mkdir(projectBackupDir, { recursive: true });
   
   // Verify project backup directory was created
   if (!existsSync(projectBackupDir)) {
     throw new Error(`Failed to create project backup directory: ${projectBackupDir}`);
   }
+  console.log(`[BACKUP] ✓ Project backup directory exists: ${projectBackupDir}`);
   
   // Generate backup directory name with timestamp
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
   const backupDirName = `${projectName}-${timestamp}`;
   const backupPath = join(projectBackupDir, backupDirName);
+  console.log(`[BACKUP] Backup directory name: ${backupDirName}`);
+  console.log(`[BACKUP] Full backup path: ${backupPath}`);
   
   // Ensure the backup path directory exists (docker cp needs the parent directory to exist)
+  console.log(`[BACKUP] Creating backup path directory: ${backupPath}`);
   await mkdir(backupPath, { recursive: true });
   
+  if (!existsSync(backupPath)) {
+    throw new Error(`Failed to create backup path directory: ${backupPath}`);
+  }
+  console.log(`[BACKUP] ✓ Backup path directory exists: ${backupPath}`);
+  
+  // Check directory permissions
+  const { stat } = await import("fs/promises");
+  try {
+    const backupPathStats = await stat(backupPath);
+    console.log(`[BACKUP] Backup path stats - Mode: ${backupPathStats.mode.toString(8)}, UID: ${backupPathStats.uid}, GID: ${backupPathStats.gid}`);
+  } catch (statError: any) {
+    console.warn(`[BACKUP] Could not get stats for backup path: ${statError.message}`);
+  }
+  
   // Get Docker instance to check if container exists
+  console.log(`[BACKUP] Connecting to Docker...`);
   let docker;
   try {
     docker = await getDocker();
+    console.log(`[BACKUP] ✓ Docker connection established`);
   } catch (error: any) {
+    console.error(`[BACKUP] ✗ Failed to connect to Docker: ${error.message || error}`);
     throw new Error(`Failed to connect to Docker: ${error.message || error}`);
   }
   
+  console.log(`[BACKUP] Checking if container exists: ${dbContainerName}`);
   try {
     const container = docker.getContainer(dbContainerName);
+    console.log(`[BACKUP] Container object created, inspecting...`);
     const containerInfo = await container.inspect();
+    
+    console.log(`[BACKUP] Container info - ID: ${containerInfo.Id.substring(0, 12)}, State: ${containerInfo.State.Status}, Running: ${containerInfo.State.Running}`);
+    console.log(`[BACKUP] Container info - Image: ${containerInfo.Config?.Image}, Created: ${containerInfo.Created}`);
     
     // Check if container is running
     if (!containerInfo.State.Running) {
+      console.error(`[BACKUP] ✗ Container is not running. State: ${containerInfo.State.Status}`);
       throw new Error(`Database container '${dbContainerName}' is not running. Current state: ${containerInfo.State.Status}`);
     }
     
-    console.log(`Container ${dbContainerName} is running`);
+    console.log(`[BACKUP] ✓ Container ${dbContainerName} is running`);
   } catch (error: any) {
+    console.error(`[BACKUP] ✗ Container check failed: ${error.message || error}`);
     if (error.message && error.message.includes("is not running")) {
       throw error;
     }
@@ -166,18 +208,37 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     }
     
     // Verify backup was created
+    console.log(`[BACKUP] Verifying backup directory exists: ${backupPath}`);
     if (!existsSync(backupPath)) {
+      console.error(`[BACKUP] ✗ Backup directory does not exist: ${backupPath}`);
       throw new Error(`Backup directory was not created: ${backupPath}`);
     }
+    console.log(`[BACKUP] ✓ Backup directory exists: ${backupPath}`);
     
     // List contents to verify
-    const { readdir } = await import("fs/promises");
+    console.log(`[BACKUP] Reading backup directory contents...`);
+    const { readdir, stat } = await import("fs/promises");
     const contents = await readdir(backupPath);
-    console.log(`Backup directory contents: ${contents.join(", ")}`);
+    console.log(`[BACKUP] Backup directory contains ${contents.length} items: ${contents.join(", ")}`);
+    
     if (contents.length === 0) {
+      console.error(`[BACKUP] ✗ Backup directory is empty: ${backupPath}`);
       throw new Error(`Backup directory is empty: ${backupPath}`);
     }
     
+    // Get file sizes and details
+    console.log(`[BACKUP] Getting file details...`);
+    for (const file of contents) {
+      try {
+        const filePath = join(backupPath, file);
+        const fileStats = await stat(filePath);
+        console.log(`[BACKUP]   - ${file}: ${fileStats.size} bytes, mode: ${fileStats.mode.toString(8)}`);
+      } catch (fileError: any) {
+        console.warn(`[BACKUP]   - ${file}: Could not get stats: ${fileError.message}`);
+      }
+    }
+    
+    console.log(`[BACKUP] ✓ Backup completed successfully: ${backupPath}`);
     return backupPath;
   } catch (error: any) {
     console.error(`Backup error: ${error.message}`);
