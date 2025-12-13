@@ -13,7 +13,11 @@ interface VisitorStats {
   requestsToday?: number;
 }
 
+// Track previous network stats to detect active traffic
+let previousNetworkStats: Map<string, { rx: number; tx: number; timestamp: number }> = new Map();
+
 // Get active TCP connections for a container
+// Since direct connection counting doesn't work well with NPM, we estimate based on network activity
 export async function getActiveConnections(projectName: string, port: number): Promise<number> {
   try {
     // Get the container's IP address and internal port
@@ -237,6 +241,56 @@ export async function getActiveConnections(projectName: string, port: number): P
         }
       } catch (conntrackError) {
         console.log(`[Visitor] Method 6 (conntrack) not available`);
+      }
+    }
+
+    // If all direct methods fail, estimate based on network activity
+    if (totalConnections === 0) {
+      try {
+        const stats = await container.stats({ stream: false });
+        const statsData = stats as any;
+        
+        if (statsData.networks) {
+          let totalRx = 0;
+          let totalTx = 0;
+          for (const networkName in statsData.networks) {
+            const network = statsData.networks[networkName];
+            totalRx += network.rx_bytes || 0;
+            totalTx += network.tx_bytes || 0;
+          }
+          
+          // Get previous stats
+          const previous = previousNetworkStats.get(projectName);
+          const now = Date.now();
+          
+          if (previous) {
+            const timeDiff = (now - previous.timestamp) / 1000; // seconds
+            if (timeDiff > 0) {
+              const rxDiff = totalRx - previous.rx;
+              const txDiff = totalTx - previous.tx;
+              const totalDiff = rxDiff + txDiff;
+              
+              // If there's significant traffic in the last few seconds, estimate active connections
+              // Rough estimate: ~1KB per second per active user = 1 connection
+              const bytesPerSecond = totalDiff / timeDiff;
+              const estimatedConnections = Math.floor(bytesPerSecond / 1024); // 1KB/s per connection
+              
+              if (estimatedConnections > 0) {
+                console.log(`[Visitor] Method 7 (network activity): ${estimatedConnections} estimated connections (${bytesPerSecond.toFixed(0)} bytes/s)`);
+                totalConnections = estimatedConnections;
+              }
+            }
+          }
+          
+          // Update previous stats
+          previousNetworkStats.set(projectName, {
+            rx: totalRx,
+            tx: totalTx,
+            timestamp: now,
+          });
+        }
+      } catch (error) {
+        console.log(`[Visitor] Method 7 (network activity) failed:`, error);
       }
     }
 
