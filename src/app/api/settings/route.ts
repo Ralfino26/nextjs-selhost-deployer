@@ -40,6 +40,9 @@ export async function GET() {
         startingPort: 5000,
         websitesNetwork: "websites_network",
         infraNetwork: "infra_network",
+        npmUrl: process.env.NPM_URL || "http://nginx-proxy-manager:81",
+        npmEmail: process.env.NPM_EMAIL || "",
+        npmPassword: process.env.NPM_PASSWORD || "",
       });
     }
   } catch (error) {
@@ -61,8 +64,16 @@ export async function POST(request: NextRequest) {
     const { mkdir } = await import("fs/promises");
     await mkdir(join(process.cwd(), "data"), { recursive: true });
 
+    // Ensure optional fields are included (even if empty)
+    const configToSave = {
+      ...config,
+      npmUrl: config.npmUrl || "",
+      npmEmail: config.npmEmail || "",
+      npmPassword: config.npmPassword || "",
+    };
+
     // Save to file
-    await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+    await writeFile(CONFIG_FILE, JSON.stringify(configToSave, null, 2), "utf-8");
 
     // Clear config cache so new values are loaded
     clearConfigCache();
