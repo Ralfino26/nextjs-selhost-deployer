@@ -109,6 +109,71 @@ export async function GET(
         console.warn(`Failed to get container info for ${projectName}:`, error);
       }
 
+      // Get Database information if database exists
+      let databaseInfo: ProjectDetails["database"] | undefined;
+      
+      if (hasDatabase) {
+        try {
+          const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
+          const databaseComposeContent = await readFile(databaseComposePath, "utf-8").catch(() => "");
+          
+          // Extract database info from docker-compose.yml
+          const dbNameMatch = databaseComposeContent.match(/MONGO_INITDB_DATABASE:\s*(\w+)/);
+          const portMatch = databaseComposeContent.match(/ports:\s*-\s*"(\d+):/);
+          const imageMatch = databaseComposeContent.match(/image:\s*([^\s]+)/);
+          
+          const databaseName = dbNameMatch ? dbNameMatch[1] : projectName;
+          const databasePort = portMatch ? parseInt(portMatch[1], 10) : undefined;
+          const databaseImage = imageMatch ? imageMatch[1] : undefined;
+          const databaseVolumePath = join(projectDir, "database", "data");
+          
+          // Get database container information
+          const dbContainerName = `${projectName}-mongo`;
+          let dbContainerId: string | undefined;
+          let dbContainerStatus: "Running" | "Stopped" | "Error" | undefined;
+          let dbContainerImage: string | undefined;
+          
+          try {
+            const { getDocker } = await import("@/lib/services/docker.service");
+            const docker = await getDocker();
+            const dbContainer = docker.getContainer(dbContainerName);
+            const dbInfo = await dbContainer.inspect();
+            
+            dbContainerId = dbInfo.Id.substring(0, 12);
+            dbContainerImage = dbInfo.Config?.Image;
+            
+            if (dbInfo.State.Running) {
+              dbContainerStatus = "Running";
+            } else if (dbInfo.State.Status === "exited") {
+              dbContainerStatus = "Stopped";
+            } else {
+              dbContainerStatus = "Error";
+            }
+          } catch (error) {
+            // Database container might not exist or not be running
+            dbContainerStatus = "Stopped";
+          }
+          
+          // Generate connection string
+          const dbUser = config.database.user;
+          const dbPassword = config.database.password;
+          const connectionString = `mongodb://${dbUser}:${dbPassword}@${dbContainerName}:27017/${databaseName}`;
+          
+          databaseInfo = {
+            containerId: dbContainerId,
+            containerStatus: dbContainerStatus,
+            containerImage: dbContainerImage || databaseImage,
+            databaseName,
+            port: databasePort,
+            connectionString,
+            volumePath: databaseVolumePath,
+            username: dbUser,
+          };
+        } catch (error) {
+          console.warn(`Failed to get database info for ${projectName}:`, error);
+        }
+      }
+
       const project: ProjectDetails = {
         id: projectName,
         name: projectName,
@@ -127,6 +192,7 @@ export async function GET(
         containerNetworks,
         dockerComposePath,
         repoPath,
+        database: databaseInfo,
       };
 
       return NextResponse.json(project);

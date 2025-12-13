@@ -390,6 +390,103 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
+        {/* Database Information Card */}
+        {project.database && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold text-gray-700">Database Information</h2>
+            <div className="space-y-2 text-sm">
+              {project.database.containerStatus && (
+                <div>
+                  <span className="font-medium text-gray-600">Status:</span>
+                  <div className="mt-0.5">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                        project.database.containerStatus === "Running"
+                          ? "bg-green-100 text-green-800"
+                          : project.database.containerStatus === "Stopped"
+                          ? "bg-gray-100 text-gray-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {project.database.containerStatus}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {project.database.containerId && (
+                <div>
+                  <span className="font-medium text-gray-600">Container ID:</span>
+                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                    {project.database.containerId}
+                  </p>
+                </div>
+              )}
+              {project.database.containerImage && (
+                <div>
+                  <span className="font-medium text-gray-600">Image:</span>
+                  <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                    {project.database.containerImage}
+                  </p>
+                </div>
+              )}
+              {project.database.databaseName && (
+                <div>
+                  <span className="font-medium text-gray-600">Database Name:</span>
+                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                    {project.database.databaseName}
+                  </p>
+                </div>
+              )}
+              {project.database.port && (
+                <div>
+                  <span className="font-medium text-gray-600">Port:</span>
+                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                    {project.database.port}
+                  </p>
+                </div>
+              )}
+              {project.database.username && (
+                <div>
+                  <span className="font-medium text-gray-600">Username:</span>
+                  <p className="mt-0.5 font-mono text-xs text-gray-900">
+                    {project.database.username}
+                  </p>
+                </div>
+              )}
+              {project.database.connectionString && (
+                <div>
+                  <span className="font-medium text-gray-600">Connection String:</span>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <p className="flex-1 break-all font-mono text-xs text-gray-900">
+                      {project.database.connectionString}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(project.database!.connectionString!);
+                        setActionMessage({ type: "success", text: "Connection string copied to clipboard" });
+                        setTimeout(() => setActionMessage(null), 2000);
+                      }}
+                      className="h-6 text-xs"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {project.database.volumePath && (
+                <div>
+                  <span className="font-medium text-gray-600">Volume Path:</span>
+                  <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                    {project.database.volumePath}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* File Paths Card */}
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-gray-700">File Paths</h2>

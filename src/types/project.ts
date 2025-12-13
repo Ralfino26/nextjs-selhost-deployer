@@ -20,6 +20,16 @@ export interface ProjectDetails extends Project {
   containerNetworks?: string[];
   dockerComposePath?: string;
   repoPath?: string;
+  database?: {
+    containerId?: string;
+    containerStatus?: "Running" | "Stopped" | "Error";
+    containerImage?: string;
+    databaseName?: string;
+    port?: number;
+    connectionString?: string;
+    volumePath?: string;
+    username?: string;
+  };
 }
 
 export interface CreateProjectRequest {
