@@ -76,10 +76,18 @@ export async function createMongoBackup(projectName: string): Promise<string> {
   const projectBackupDir = join(backupBaseDir, projectName);
   await mkdir(projectBackupDir, { recursive: true });
   
+  // Verify project backup directory was created
+  if (!existsSync(projectBackupDir)) {
+    throw new Error(`Failed to create project backup directory: ${projectBackupDir}`);
+  }
+  
   // Generate backup directory name with timestamp
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
   const backupDirName = `${projectName}-${timestamp}`;
   const backupPath = join(projectBackupDir, backupDirName);
+  
+  // Ensure the backup path directory exists (docker cp needs the parent directory to exist)
+  await mkdir(backupPath, { recursive: true });
   
   // Get Docker instance to check if container exists
   const docker = await getDocker();
