@@ -81,6 +81,18 @@ export async function createMongoBackup(projectName: string): Promise<string> {
   // Execute mongodump inside the container
   // mongodump will create a dump directory with the database backup
   try {
+    // First, verify connection by listing databases
+    const testConnectionCommand = `docker exec ${dbContainerName} mongosh --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --eval "db.adminCommand('listDatabases')" --quiet`;
+    
+    try {
+      await execAsync(testConnectionCommand, {
+        shell: "/bin/sh",
+        env: { ...process.env },
+      });
+    } catch (testError: any) {
+      throw new Error(`Failed to authenticate with MongoDB. Please verify credentials in Settings. Error: ${testError.message || testError}`);
+    }
+    
     // Run mongodump inside the container
     // Authenticate with admin database, then dump the specific database
     const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /tmp/backup`;
