@@ -40,6 +40,7 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     fetchProject();
     fetchEnvVars();
+    fetchEnvComparison();
   }, [projectId]);
 
   // Real-time metrics stream using Server-Sent Events
