@@ -133,22 +133,49 @@ export async function createMongoBackup(projectName: string): Promise<string> {
       });
     }
     
-    // Copy the backup from container to host
-    const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName} ${backupPath}`;
+    // Copy the entire backup directory from container to host
+    // mongodump creates /tmp/backup/{databaseName}/... so we copy the whole backup directory
+    const copyCommand = `docker cp ${dbContainerName}:/tmp/backup ${backupPath}`;
+    console.log(`Copying backup from container: ${copyCommand}`);
     await execAsync(copyCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
     });
     
+    // Verify the backup was copied
+    const { existsSync } = await import("fs");
+    const databaseBackupPath = join(backupPath, databaseName);
+    if (!existsSync(databaseBackupPath)) {
+      // Try alternative path (if all databases were dumped)
+      if (!existsSync(backupPath)) {
+        throw new Error(`Backup directory not found after copy: ${backupPath}`);
+      }
+      // If backup path exists but database folder doesn't, check what's inside
+      const { readdir } = await import("fs/promises");
+      const contents = await readdir(backupPath);
+      console.log(`Backup directory contents: ${contents.join(", ")}`);
+      if (contents.length === 0) {
+        throw new Error(`Backup directory is empty: ${backupPath}`);
+      }
+    }
+    
     // Create a tar archive of the backup
+    // Tar the entire backup directory
     const tarCommand = `tar -czf ${backupPath}.tar.gz -C ${projectBackupDir} ${backupFileName}`;
+    console.log(`Creating tar archive: ${tarCommand}`);
     await execAsync(tarCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
     });
     
+    // Verify tar was created
+    if (!existsSync(`${backupPath}.tar.gz`)) {
+      throw new Error(`Tar archive was not created: ${backupPath}.tar.gz`);
+    }
+    
     // Remove the uncompressed backup directory
     const rmCommand = `rm -rf ${backupPath}`;
+    console.log(`Cleaning up uncompressed backup: ${rmCommand}`);
     await execAsync(rmCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
