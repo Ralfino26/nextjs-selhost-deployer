@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ArrowUp, ArrowDown, Maximize2, ExternalLink, CheckCircle2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +31,10 @@ export function DeployModal({
   isDeploying,
 }: DeployModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
-  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(["building"]));
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({
+    building: true,
+    deploying: false,
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Prevent body scroll when modal is open
@@ -46,74 +49,70 @@ export function DeployModal({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  // Split logs into phases
-  const splitLogsByPhase = (logs: string) => {
+  // Split logs into phases - memoized
+  const { buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
     const buildStartMarker = "🔨 Starting build";
     const buildEndMarker = "✅ Build completed";
     const deployStartMarker = "🚀 Starting containers";
     const deployEndMarker = "✅ Deployment completed";
 
-    const buildLogs: string[] = [];
-    const deployLogs: string[] = [];
+    const buildLogsArray: string[] = [];
+    const deployLogsArray: string[] = [];
     let currentPhase: "build" | "deploy" | null = null;
 
-    const lines = logs.split("\n");
+    const lines = deployLogs.split("\n");
     for (const line of lines) {
       if (line.includes(buildStartMarker)) {
         currentPhase = "build";
-        buildLogs.push(line);
+        buildLogsArray.push(line);
       } else if (line.includes(buildEndMarker)) {
         if (currentPhase === "build") {
-          buildLogs.push(line);
+          buildLogsArray.push(line);
         }
         currentPhase = null;
       } else if (line.includes(deployStartMarker)) {
         currentPhase = "deploy";
-        deployLogs.push(line);
+        deployLogsArray.push(line);
       } else if (line.includes(deployEndMarker)) {
         if (currentPhase === "deploy") {
-          deployLogs.push(line);
+          deployLogsArray.push(line);
         }
         currentPhase = null;
       } else {
         if (currentPhase === "build") {
-          buildLogs.push(line);
+          buildLogsArray.push(line);
         } else if (currentPhase === "deploy") {
-          deployLogs.push(line);
+          deployLogsArray.push(line);
         }
       }
     }
 
-    return { buildLogs, deployLogs };
-  };
+    return { buildLogs: buildLogsArray, deployLogs: deployLogsArray };
+  }, [deployLogs]);
 
-  const { buildLogs, deployLogs: deployPhaseLogs } = splitLogsByPhase(deployLogs);
-
-  const formatLogsWithLineNumbers = (logs: string[]) => {
-    return logs.map((line, index) => ({
+  // Format logs with line numbers - memoized
+  const buildLogLines = useMemo(() => {
+    return buildLogs.map((line, index) => ({
       number: index + 1,
       content: line,
     }));
-  };
+  }, [buildLogs]);
 
-  const buildLogLines = formatLogsWithLineNumbers(buildLogs);
-  const deployLogLines = formatLogsWithLineNumbers(deployPhaseLogs);
+  const deployLogLines = useMemo(() => {
+    return deployPhaseLogs.map((line, index) => ({
+      number: index + 1,
+      content: line,
+    }));
+  }, [deployPhaseLogs]);
 
-  const togglePhase = (phaseKey: string) => {
-    setExpandedPhases((prev) => {
-      const next = new Set(prev);
-      if (next.has(phaseKey)) {
-        next.delete(phaseKey);
-      } else {
-        next.add(phaseKey);
-      }
-      return next;
-    });
-  };
+  const togglePhase = useCallback((phaseKey: string) => {
+    setExpandedPhases((prev) => ({
+      ...prev,
+      [phaseKey]: !prev[phaseKey],
+    }));
+  }, []);
 
-  const handleCopyLogs = async () => {
+  const handleCopyLogs = useCallback(async () => {
     try {
       // Copy all logs (both build and deploy)
       const allLogs = deployLogs || "";
@@ -160,32 +159,37 @@ export function DeployModal({
       console.error("Failed to copy logs:", error);
       toast.error("Failed to copy logs. Please select and copy manually.");
     }
-  };
+  }, [deployLogs]);
 
-  const scrollToTop = () => {
+  const scrollToTop = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
     }
-  };
+  }, []);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
-  };
+  }, []);
 
   // Auto-scroll to bottom when new logs arrive (only if already near bottom)
   useEffect(() => {
-    if (scrollContainerRef.current && deployLogs) {
-      const container = scrollContainerRef.current;
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-      if (isNearBottom) {
-        setTimeout(() => {
-          container.scrollTop = container.scrollHeight;
-        }, 50);
-      }
+    if (!scrollContainerRef.current || !deployLogs) return;
+    
+    const container = scrollContainerRef.current;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    if (isNearBottom) {
+      const timeoutId = setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
+      }, 50);
+      return () => clearTimeout(timeoutId);
     }
   }, [deployLogs]);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -317,7 +321,7 @@ export function DeployModal({
                 >
                   <div className="flex items-center justify-between px-6 py-4">
                     <div className="flex items-center gap-3">
-                      {expandedPhases.has("building") ? (
+                      {expandedPhases.building ? (
                         <ChevronDown className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       ) : (
                         <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -356,7 +360,7 @@ export function DeployModal({
                 </button>
                 
                 {/* Phase Content - Collapsible */}
-                {expandedPhases.has("building") && (
+                {expandedPhases.building && (
                   <div className="bg-black border-t border-gray-800">
                     <div className="font-mono text-sm text-gray-100 antialiased p-6 pr-0">
                       {buildLogLines.length > 0 ? (
@@ -401,7 +405,7 @@ export function DeployModal({
                 >
                   <div className="flex items-center justify-between px-6 py-4">
                     <div className="flex items-center gap-3">
-                      {expandedPhases.has("deploying") ? (
+                      {expandedPhases.deploying ? (
                         <ChevronDown className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       ) : (
                         <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -440,7 +444,7 @@ export function DeployModal({
                 </button>
                 
                 {/* Phase Content - Collapsible */}
-                {expandedPhases.has("deploying") && (
+                {expandedPhases.deploying && (
                   <div className="bg-black border-t border-gray-800">
                     <div className="font-mono text-sm text-gray-100 antialiased p-6 pr-0">
                       {deployLogLines.length > 0 ? (
