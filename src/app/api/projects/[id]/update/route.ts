@@ -87,12 +87,8 @@ export async function POST(
         );
       }
 
-      // Update remote URL with token (use x-access-token format for better compatibility)
-      // GitHub tokens work better with x-access-token or oauth2 format
-      const tokenPrefix = config.githubToken.startsWith("ghp_") || config.githubToken.startsWith("github_pat_") 
-        ? config.githubToken 
-        : `x-access-token:${config.githubToken}`;
-      const newUrl = `https://${tokenPrefix}@github.com/${repoPathFromUrl}.git`;
+      // Update remote URL with token (same format as used in clone)
+      const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
       console.log(`Updating remote URL from: ${remoteUrl} to: https://***@github.com/${repoPathFromUrl}.git`);
       
       try {
@@ -111,7 +107,22 @@ export async function POST(
 
     // Now pull
     try {
-      const pullResult = await execAsync("git pull origin $(git branch --show-current)", { 
+      // Get current branch first
+      const branchResult = await execAsync("git branch --show-current", {
+        cwd: repoPath,
+        shell: "/bin/sh"
+      });
+      const currentBranch = branchResult.stdout.trim();
+      
+      if (!currentBranch) {
+        return NextResponse.json(
+          { error: "Could not determine current branch" },
+          { status: 400 }
+        );
+      }
+
+      // Pull with token in URL (already set above)
+      const pullResult = await execAsync(`git pull origin ${currentBranch}`, { 
         cwd: repoPath,
         shell: "/bin/sh",
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
