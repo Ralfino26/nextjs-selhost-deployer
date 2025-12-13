@@ -16,42 +16,99 @@ interface VisitorStats {
 // Get active TCP connections for a container
 export async function getActiveConnections(projectName: string, port: number): Promise<number> {
   try {
-    // Use ss or netstat to count active connections to the container's port
-    // First, get the container's IP address
+    // Get the container's IP address and internal port
     const { getDocker } = await import("./docker.service");
     const docker = await getDocker();
     const container = docker.getContainer(projectName);
     const info = await container.inspect();
+
+    if (!info.State.Running) {
+      return 0;
+    }
 
     // Get container IP from network settings
     const networks = info.NetworkSettings?.Networks || {};
     const networkName = Object.keys(networks)[0];
     const containerIP = networks[networkName]?.IPAddress;
 
-    if (!containerIP) {
-      return 0;
-    }
+    // Internal port is usually 3000 for Next.js apps
+    const internalPort = 3000;
 
-    // Count active connections to the container's port
-    // Using ss command (more modern than netstat)
-    try {
-      const result = await execAsync(
-        `ss -tn | grep -E ":${port}|${containerIP}:${port}" | grep ESTAB | wc -l`,
-        { shell: "/bin/sh" }
-      );
-      return parseInt(result.stdout.trim(), 10) || 0;
-    } catch (error) {
-      // Fallback to netstat if ss is not available
+    if (!containerIP) {
+      // If no IP, try to count connections to the exposed port
       try {
         const result = await execAsync(
-          `netstat -tn | grep -E ":${port}|${containerIP}:${port}" | grep ESTABLISHED | wc -l`,
+          `ss -tn state established | grep ":${port} " | wc -l`,
           { shell: "/bin/sh" }
         );
         return parseInt(result.stdout.trim(), 10) || 0;
-      } catch (netstatError) {
+      } catch (error) {
         return 0;
       }
     }
+
+    // Count connections in multiple ways:
+    // 1. Connections to container IP on internal port (3000)
+    // 2. Connections to exposed port on localhost
+    // 3. Connections via container name (Docker DNS)
+    
+    let totalConnections = 0;
+
+    try {
+      // Method 1: Count connections to container IP:internalPort
+      const result1 = await execAsync(
+        `ss -tn state established | grep "${containerIP}:${internalPort}" | wc -l`,
+        { shell: "/bin/sh" }
+      );
+      totalConnections += parseInt(result1.stdout.trim(), 10) || 0;
+    } catch (error) {
+      // Ignore
+    }
+
+    try {
+      // Method 2: Count connections to exposed port (localhost:port)
+      const result2 = await execAsync(
+        `ss -tn state established | grep ":${port} " | wc -l`,
+        { shell: "/bin/sh" }
+      );
+      const exposedConnections = parseInt(result2.stdout.trim(), 10) || 0;
+      // Only add if it's higher (to avoid double counting)
+      if (exposedConnections > totalConnections) {
+        totalConnections = exposedConnections;
+      }
+    } catch (error) {
+      // Ignore
+    }
+
+    try {
+      // Method 3: Count connections via container name (Docker network DNS)
+      // This is useful when NPM forwards to container name
+      const result3 = await execAsync(
+        `ss -tn state established | grep -E "${projectName}:${internalPort}|${projectName.toLowerCase()}:${internalPort}" | wc -l`,
+        { shell: "/bin/sh" }
+      );
+      const nameConnections = parseInt(result3.stdout.trim(), 10) || 0;
+      if (nameConnections > totalConnections) {
+        totalConnections = nameConnections;
+      }
+    } catch (error) {
+      // Ignore
+    }
+
+    // Fallback to netstat if ss is not available
+    if (totalConnections === 0) {
+      try {
+        const result = await execAsync(
+          `netstat -tn | grep ESTABLISHED | grep -E "${containerIP}:${internalPort}|:${port} " | wc -l`,
+          { shell: "/bin/sh" }
+        );
+        totalConnections = parseInt(result.stdout.trim(), 10) || 0;
+      } catch (netstatError) {
+        // Ignore
+      }
+    }
+
+    return totalConnections;
   } catch (error) {
     console.error(`Error getting active connections for ${projectName}:`, error);
     return 0;
