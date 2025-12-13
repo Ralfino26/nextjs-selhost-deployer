@@ -18,6 +18,9 @@ services:
       # Mount projects directory (configured via web interface, default: /srv/vps/websites)
       # Use absolute path to mount the actual projects directory on the host
       - /srv/vps/websites:/srv/vps/websites
+      # Mount backup directory (configured via web interface, default: /srv/vps/backups)
+      # Use absolute path to mount the actual backup directory on the host
+      - /srv/vps/backups:/srv/vps/backups
       # Mount data directory for port registry (optional)
       - ./data:/app/data
     networks:
