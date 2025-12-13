@@ -1071,34 +1071,85 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      <div className="mb-6 flex gap-2">
-        <Button
-          onClick={handleDeploy}
-          disabled={actionLoading !== null}
-        >
-          {actionLoading === "deploy" ? "Deploying..." : "Deploy"}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={handleUpdate}
-          disabled={actionLoading !== null}
-        >
-          {actionLoading === "update" ? "Updating..." : "Update from GitHub"}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={handleRestart}
-          disabled={actionLoading !== null}
-        >
-          {actionLoading === "restart" ? "Restarting..." : "Restart"}
-        </Button>
-        <Button
-          variant="destructive"
-          onClick={handleDelete}
-          disabled={actionLoading !== null}
-        >
-          {actionLoading === "delete" ? "Deleting..." : "Delete Project"}
-        </Button>
+      <div className="mb-6">
+        <div className="mb-3">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Deployment Workflow</h3>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleUpdate}
+              disabled={actionLoading !== null}
+              className="flex-1"
+            >
+              {actionLoading === "update" ? (
+                <>
+                  <span className="mr-2">⏳</span>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">📥</span>
+                  1. Update from GitHub
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleDeploy}
+              disabled={actionLoading !== null}
+              className="flex-1"
+            >
+              {actionLoading === "deploy" ? (
+                <>
+                  <span className="mr-2">⏳</span>
+                  Deploying...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">🚀</span>
+                  2. Deploy
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRestart}
+            disabled={actionLoading !== null}
+            className="flex-1"
+          >
+            {actionLoading === "restart" ? (
+              <>
+                <span className="mr-2">⏳</span>
+                Restarting...
+              </>
+            ) : (
+              <>
+                <span className="mr-2">🔄</span>
+                Restart
+              </>
+            )}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={actionLoading !== null}
+            className="flex-1"
+          >
+            {actionLoading === "delete" ? (
+              <>
+                <span className="mr-2">⏳</span>
+                Deleting...
+              </>
+            ) : (
+              <>
+                <span className="mr-2">🗑️</span>
+                Delete Project
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="logs" className="w-full">
