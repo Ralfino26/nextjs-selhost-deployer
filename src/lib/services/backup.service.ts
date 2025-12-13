@@ -90,17 +90,29 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     throw new Error(`Database container '${dbContainerName}' not found. Make sure the database is running.`);
   }
   
-  // Run mongodump directly to the backup directory
-  // Mount the backup directory as a volume and run mongodump inside the container
-  const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /backup`;
-  
-  // Use docker run with volume mount to write directly to host
-  const dockerRunCommand = `docker run --rm --volumes-from ${dbContainerName} -v ${projectBackupDir}:/backup mongo:7 mongodump --host ${dbContainerName} --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /backup/${backupDirName}`;
-  
+  // Run mongodump in the container and copy output to host
   try {
-    await execAsync(dockerRunCommand, {
+    // Execute mongodump inside the container to /tmp/backup
+    const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /tmp/backup`;
+    
+    await execAsync(mongodumpCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
+    });
+    
+    // Copy the backup from container to host backup directory
+    const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName} ${backupPath}`;
+    await execAsync(copyCommand, {
+      shell: "/bin/sh",
+      env: { ...process.env },
+    });
+    
+    // Clean up the backup inside the container
+    await execAsync(`docker exec ${dbContainerName} rm -rf /tmp/backup`, {
+      shell: "/bin/sh",
+      env: { ...process.env },
+    }).catch(() => {
+      // Ignore cleanup errors
     });
     
     // Verify backup was created
