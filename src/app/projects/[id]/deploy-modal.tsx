@@ -176,31 +176,34 @@ export function DeployModal({
                   key={phase.key}
                   id={phase.key}
                   open={isExpanded || isActive}
-                  className="border-t border-gray-800"
+                  className="border-t border-gray-800 first:border-t-0"
                 >
                   <summary
-                    className="relative bg-white dark:bg-black text-gray-900 dark:text-white border-gray-200 dark:border-gray-800 py-4 pl-14 pr-6 cursor-pointer list-none after:absolute after:left-4 after:top-6 after:transition-transform after:duration-200 after:content-[''] after:w-2 after:h-2 after:border-r-2 after:border-b-2 after:border-gray-400 after:rotate-45 after:-translate-x-1/2 after:-translate-y-1/2 hover:bg-gray-50 dark:hover:bg-gray-900"
-                    style={{
-                      transform: isExpanded ? "rotate(45deg)" : "rotate(-45deg)",
-                    }}
+                    className="relative bg-white text-gray-900 py-4 pl-14 pr-6 cursor-pointer list-none hover:bg-gray-50"
                     onClick={(e) => {
                       e.preventDefault();
                       togglePhase(phase.key);
                     }}
                   >
+                    <div
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-b-2 border-gray-400 transition-transform duration-200"
+                      style={{
+                        transform: isExpanded ? "rotate(45deg)" : "rotate(-45deg)",
+                      }}
+                    />
                     <div className="flex items-center justify-between gap-4">
                       <h3 className="font-medium text-sm sm:min-w-[250px]">{phase.label}</h3>
                       <div className="ml-auto flex items-center gap-2 min-w-0 sm:flex-grow">
                         {isComplete && (
-                          <span className="flex items-center text-green-600 dark:text-green-400">
+                          <span className="flex items-center text-green-600">
                             <CheckCircle2 className="h-5 w-5 mr-2" />
-                            <span className="text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded capitalize">
+                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-0.5 rounded capitalize">
                               Complete
                             </span>
                           </span>
                         )}
                         {isActive && (
-                          <span className="flex items-center text-blue-600 dark:text-blue-400">
+                          <span className="flex items-center text-blue-600">
                             <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                             <span className="text-xs font-medium">In progress</span>
                           </span>
@@ -208,22 +211,22 @@ export function DeployModal({
                       </div>
                     </div>
                   </summary>
-                  <div className="bg-black dark:bg-gray-900">
-                    <div className="font-mono text-sm text-white antialiased p-6 pr-0 overflow-x-auto whitespace-pre-wrap">
+                  <div className="bg-black">
+                    <div className="font-mono text-sm text-white antialiased p-6 pr-0 overflow-x-auto">
                       {logLines.length > 0 ? (
                         logLines.map((line, idx) => (
                           <div
                             key={idx}
                             id={`L${line.number}`}
-                            className="relative pl-10 hover:bg-gray-900"
+                            className="relative pl-10 hover:bg-gray-900 min-h-[1.5rem]"
                           >
                             <div
-                              className="absolute left-0 top-0 h-full min-w-16 text-right pr-4 text-gray-500 dark:text-gray-400 hover:text-white cursor-pointer select-none"
+                              className="absolute left-0 top-0 h-full min-w-16 text-right pr-4 text-gray-500 hover:text-white cursor-pointer select-none leading-[1.5rem]"
                               data-line-number={line.number}
                             >
                               {line.number}
                             </div>
-                            <div className="border-l-2 border-gray-800 break-words pl-10 pr-4">
+                            <div className="border-l-2 border-gray-800 break-words pl-10 pr-4 leading-[1.5rem] whitespace-pre-wrap">
                               {line.content || " "}
                             </div>
                           </div>
