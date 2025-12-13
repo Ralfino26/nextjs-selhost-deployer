@@ -62,12 +62,13 @@ export async function getActiveConnections(projectName: string, port: number): P
     
     let totalConnections = 0;
 
-    // Method 1: Check connections inside the container (most accurate)
+    // Method 1: Check ALL connections inside the container (most accurate)
+    // Count all ESTABLISHED connections, not just to port 3000
     try {
       const execResult = await new Promise<string>((resolve, reject) => {
         container.exec(
           {
-            Cmd: ["sh", "-c", `ss -tn state established 2>/dev/null | grep ":${internalPort}" | wc -l || netstat -tn 2>/dev/null | grep ESTABLISHED | grep ":${internalPort}" | wc -l || echo "0"`],
+            Cmd: ["sh", "-c", `ss -tn state established 2>/dev/null | wc -l || netstat -tn 2>/dev/null | grep ESTABLISHED | wc -l || echo "0"`],
             AttachStdout: true,
             AttachStderr: true,
           },
@@ -97,9 +98,10 @@ export async function getActiveConnections(projectName: string, port: number): P
       });
       
       const containerConnections = parseInt(execResult, 10) || 0;
-      console.log(`[Visitor] Method 1 (container exec): ${containerConnections} connections`);
+      console.log(`[Visitor] Method 1 (container exec - all connections): ${containerConnections} connections`);
       if (containerConnections > 0) {
-        totalConnections = containerConnections;
+        // Subtract 1 for the exec connection itself
+        totalConnections = Math.max(0, containerConnections - 1);
       }
     } catch (error) {
       console.log(`[Visitor] Method 1 (container exec) failed:`, error);
@@ -121,18 +123,73 @@ export async function getActiveConnections(projectName: string, port: number): P
       }
     }
 
-    // Method 3: Count connections to exposed port (localhost:port)
+    // Method 3: Count ALL connections to exposed port (not just ESTABLISHED, but also TIME_WAIT, etc.)
     if (totalConnections === 0) {
       try {
         const result2 = await execAsync(
-          `ss -tn state established 2>/dev/null | grep ":${port} " | wc -l`,
+          `ss -tn 2>/dev/null | grep ":${port} " | wc -l`,
           { shell: "/bin/sh" }
         );
         const count = parseInt(result2.stdout.trim(), 10) || 0;
-        console.log(`[Visitor] Method 3 (exposed port): ${count} connections`);
+        console.log(`[Visitor] Method 3 (exposed port - all states): ${count} connections`);
         totalConnections = count;
       } catch (error) {
         console.log(`[Visitor] Method 3 failed:`, error);
+      }
+    }
+
+    // Method 3b: Check connections in NPM container that forward to this container
+    if (totalConnections === 0) {
+      try {
+        const { getDocker } = await import("./docker.service");
+        const docker = await getDocker();
+        const containers = await docker.listContainers({ all: true });
+        const npmContainer = containers.find((c) => 
+          c.Names?.some(name => name.includes("nginx-proxy-manager") || name.includes("npm"))
+        );
+
+        if (npmContainer) {
+          const npm = docker.getContainer(npmContainer.Id);
+          const npmExecResult = await new Promise<string>((resolve, reject) => {
+            npm.exec(
+              {
+                Cmd: ["sh", "-c", `ss -tn state established 2>/dev/null | grep "${containerIP}:${internalPort}" | wc -l || netstat -tn 2>/dev/null | grep ESTABLISHED | grep "${containerIP}:${internalPort}" | wc -l || echo "0"`],
+                AttachStdout: true,
+                AttachStderr: true,
+              },
+              (err, exec) => {
+                if (err) {
+                  reject(err);
+                  return;
+                }
+                
+                exec?.start({}, (err, stream) => {
+                  if (err) {
+                    reject(err);
+                    return;
+                  }
+                  
+                  let output = "";
+                  stream?.on("data", (chunk: Buffer) => {
+                    output += chunk.toString();
+                  });
+                  
+                  stream?.on("end", () => {
+                    resolve(output.trim());
+                  });
+                });
+              }
+            );
+          });
+          
+          const npmConnections = parseInt(npmExecResult, 10) || 0;
+          console.log(`[Visitor] Method 3b (NPM container): ${npmConnections} connections`);
+          if (npmConnections > 0) {
+            totalConnections = npmConnections;
+          }
+        }
+      } catch (error) {
+        console.log(`[Visitor] Method 3b (NPM container) failed:`, error);
       }
     }
 
