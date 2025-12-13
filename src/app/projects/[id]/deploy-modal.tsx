@@ -124,14 +124,20 @@ export function DeployModal({
   const scrollToTop = () => {
     const logContainer = document.getElementById("deploy-logs-container");
     if (logContainer) {
-      logContainer.scrollTop = 0;
+      const scrollable = logContainer.querySelector(".overflow-y-auto") as HTMLElement;
+      if (scrollable) {
+        scrollable.scrollTop = 0;
+      }
     }
   };
 
   const scrollToBottom = () => {
     const logContainer = document.getElementById("deploy-logs-container");
     if (logContainer) {
-      logContainer.scrollTop = logContainer.scrollHeight;
+      const scrollable = logContainer.querySelector(".overflow-y-auto") as HTMLElement;
+      if (scrollable) {
+        scrollable.scrollTop = scrollable.scrollHeight;
+      }
     }
   };
 
