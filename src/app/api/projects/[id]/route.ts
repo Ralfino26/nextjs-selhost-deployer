@@ -286,7 +286,7 @@ export async function GET(
         domain: domain || "ERROR: Domain not found in Nginx Proxy Manager",
         createDatabase: hasDatabase,
         status,
-        lastDeployment: lastDeployment || project.lastDeployment,
+        lastDeployment: lastDeployment,
         directory: projectDir,
         gitRemote,
         gitBranch,
