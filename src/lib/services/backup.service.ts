@@ -16,7 +16,11 @@ const execAsync = promisify(exec);
 export async function createMongoBackup(projectName: string): Promise<string> {
   const dbContainerName = `${projectName}-mongo`;
   const databaseName = projectName;
-  const backupBaseDir = config.backupBaseDir;
+  const backupBaseDir = config.backupBaseDir || "/srv/vps/backups";
+  
+  if (!backupBaseDir) {
+    throw new Error("Backup base directory not configured. Please set it in Settings.");
+  }
   
   // Ensure backup directory exists
   await mkdir(backupBaseDir, { recursive: true });
