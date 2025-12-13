@@ -23,6 +23,7 @@ export async function getActiveConnections(projectName: string, port: number): P
     const info = await container.inspect();
 
     if (!info.State.Running) {
+      console.log(`[Visitor] Container ${projectName} is not running`);
       return 0;
     }
 
@@ -34,15 +35,21 @@ export async function getActiveConnections(projectName: string, port: number): P
     // Internal port is usually 3000 for Next.js apps
     const internalPort = 3000;
 
+    console.log(`[Visitor] Checking connections for ${projectName}: IP=${containerIP}, internalPort=${internalPort}, exposedPort=${port}`);
+
     if (!containerIP) {
+      console.log(`[Visitor] No container IP found, trying exposed port ${port}`);
       // If no IP, try to count connections to the exposed port
       try {
         const result = await execAsync(
           `ss -tn state established | grep ":${port} " | wc -l`,
           { shell: "/bin/sh" }
         );
-        return parseInt(result.stdout.trim(), 10) || 0;
+        const count = parseInt(result.stdout.trim(), 10) || 0;
+        console.log(`[Visitor] Found ${count} connections to exposed port ${port}`);
+        return count;
       } catch (error) {
+        console.error(`[Visitor] Error checking exposed port:`, error);
         return 0;
       }
     }
@@ -60,7 +67,7 @@ export async function getActiveConnections(projectName: string, port: number): P
       const execResult = await new Promise<string>((resolve, reject) => {
         container.exec(
           {
-            Cmd: ["sh", "-c", `ss -tn state established | grep ":${internalPort}" | wc -l || netstat -tn | grep ESTABLISHED | grep ":${internalPort}" | wc -l || echo "0"`],
+            Cmd: ["sh", "-c", `ss -tn state established 2>/dev/null | grep ":${internalPort}" | wc -l || netstat -tn 2>/dev/null | grep ESTABLISHED | grep ":${internalPort}" | wc -l || echo "0"`],
             AttachStdout: true,
             AttachStderr: true,
           },
@@ -90,10 +97,12 @@ export async function getActiveConnections(projectName: string, port: number): P
       });
       
       const containerConnections = parseInt(execResult, 10) || 0;
+      console.log(`[Visitor] Method 1 (container exec): ${containerConnections} connections`);
       if (containerConnections > 0) {
         totalConnections = containerConnections;
       }
     } catch (error) {
+      console.log(`[Visitor] Method 1 (container exec) failed:`, error);
       // Container exec failed, try other methods
     }
 
@@ -101,12 +110,14 @@ export async function getActiveConnections(projectName: string, port: number): P
     if (totalConnections === 0) {
       try {
         const result1 = await execAsync(
-          `ss -tn state established | grep "${containerIP}:${internalPort}" | wc -l`,
+          `ss -tn state established 2>/dev/null | grep "${containerIP}:${internalPort}" | wc -l`,
           { shell: "/bin/sh" }
         );
-        totalConnections = parseInt(result1.stdout.trim(), 10) || 0;
+        const count = parseInt(result1.stdout.trim(), 10) || 0;
+        console.log(`[Visitor] Method 2 (container IP): ${count} connections`);
+        totalConnections = count;
       } catch (error) {
-        // Ignore
+        console.log(`[Visitor] Method 2 failed:`, error);
       }
     }
 
@@ -114,12 +125,14 @@ export async function getActiveConnections(projectName: string, port: number): P
     if (totalConnections === 0) {
       try {
         const result2 = await execAsync(
-          `ss -tn state established | grep ":${port} " | wc -l`,
+          `ss -tn state established 2>/dev/null | grep ":${port} " | wc -l`,
           { shell: "/bin/sh" }
         );
-        totalConnections = parseInt(result2.stdout.trim(), 10) || 0;
+        const count = parseInt(result2.stdout.trim(), 10) || 0;
+        console.log(`[Visitor] Method 3 (exposed port): ${count} connections`);
+        totalConnections = count;
       } catch (error) {
-        // Ignore
+        console.log(`[Visitor] Method 3 failed:`, error);
       }
     }
 
@@ -127,28 +140,50 @@ export async function getActiveConnections(projectName: string, port: number): P
     if (totalConnections === 0) {
       try {
         const result3 = await execAsync(
-          `ss -tn state established | grep -E "${projectName}:${internalPort}|${projectName.toLowerCase()}:${internalPort}" | wc -l`,
+          `ss -tn state established 2>/dev/null | grep -E "${projectName}:${internalPort}|${projectName.toLowerCase()}:${internalPort}" | wc -l`,
           { shell: "/bin/sh" }
         );
-        totalConnections = parseInt(result3.stdout.trim(), 10) || 0;
+        const count = parseInt(result3.stdout.trim(), 10) || 0;
+        console.log(`[Visitor] Method 4 (container name): ${count} connections`);
+        totalConnections = count;
       } catch (error) {
-        // Ignore
+        console.log(`[Visitor] Method 4 failed:`, error);
       }
     }
 
-    // Fallback to netstat if ss is not available
+    // Method 5: Use netstat as fallback
     if (totalConnections === 0) {
       try {
         const result = await execAsync(
-          `netstat -tn | grep ESTABLISHED | grep -E "${containerIP}:${internalPort}|:${port} " | wc -l`,
+          `netstat -tn 2>/dev/null | grep ESTABLISHED | grep -E "${containerIP}:${internalPort}|:${port} " | wc -l`,
           { shell: "/bin/sh" }
         );
-        totalConnections = parseInt(result.stdout.trim(), 10) || 0;
+        const count = parseInt(result.stdout.trim(), 10) || 0;
+        console.log(`[Visitor] Method 5 (netstat fallback): ${count} connections`);
+        totalConnections = count;
       } catch (netstatError) {
-        // Ignore
+        console.log(`[Visitor] Method 5 failed:`, netstatError);
       }
     }
 
+    // Method 6: Try using conntrack (if available) - most accurate for NAT connections
+    if (totalConnections === 0) {
+      try {
+        const result = await execAsync(
+          `conntrack -L 2>/dev/null | grep -E "${containerIP}|${port}" | grep ESTABLISHED | wc -l || echo "0"`,
+          { shell: "/bin/sh" }
+        );
+        const count = parseInt(result.stdout.trim(), 10) || 0;
+        console.log(`[Visitor] Method 6 (conntrack): ${count} connections`);
+        if (count > 0) {
+          totalConnections = count;
+        }
+      } catch (conntrackError) {
+        console.log(`[Visitor] Method 6 (conntrack) not available`);
+      }
+    }
+
+    console.log(`[Visitor] Final result for ${projectName}: ${totalConnections} active connections`);
     return totalConnections;
   } catch (error) {
     console.error(`Error getting active connections for ${projectName}:`, error);
