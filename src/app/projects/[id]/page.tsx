@@ -27,13 +27,27 @@ export default function ProjectDetailPage() {
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showDeployLogs, setShowDeployLogs] = useState(false);
   const [deployLogs, setDeployLogs] = useState<string>("");
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchProject();
     fetchEnvVars();
   }, [projectId]);
 
-  const fetchProject = async () => {
+  // Auto-refresh metrics every 5 seconds
+  useEffect(() => {
+    // Only auto-refresh if enabled, project is loaded and no actions are in progress
+    if (!autoRefresh || !project || actionLoading !== null || loading) return;
+
+    const interval = setInterval(() => {
+      fetchProject(true); // Silent refresh - don't set loading state
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, project, actionLoading, loading, projectId]);
+
+  const fetchProject = async (silent = false) => {
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}`, {
@@ -42,11 +56,14 @@ export default function ProjectDetailPage() {
       if (response.ok) {
         const data = await response.json();
         setProject(data);
+        setLastRefresh(new Date());
       }
     } catch (error) {
       console.error("Error fetching project:", error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -285,6 +302,32 @@ export default function ProjectDetailPage() {
                 </a>
               )}
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span>Auto-refresh</span>
+              </label>
+            </div>
+            {lastRefresh && (
+              <div className="text-xs text-gray-500">
+                Updated: {lastRefresh.toLocaleTimeString()}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchProject(true)}
+              className="text-xs"
+            >
+              🔄 Refresh
+            </Button>
           </div>
         </div>
       </div>
