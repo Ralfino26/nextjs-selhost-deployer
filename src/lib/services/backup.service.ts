@@ -9,24 +9,46 @@ import { getDocker } from "./docker.service";
 const execAsync = promisify(exec);
 
 /**
- * Get database name from docker-compose.yml
+ * Get database configuration from docker-compose.yml
  */
-async function getDatabaseName(projectName: string): Promise<string> {
+async function getDatabaseConfig(projectName: string): Promise<{
+  databaseName: string;
+  username: string;
+  password: string;
+}> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
   
   if (!existsSync(databaseComposePath)) {
-    // Fallback to project name if docker-compose.yml doesn't exist
-    return projectName;
+    throw new Error(`Database docker-compose.yml not found for project ${projectName}`);
   }
   
   try {
     const databaseComposeContent = await readFile(databaseComposePath, "utf-8");
+    
+    // Extract database name
     const dbNameMatch = databaseComposeContent.match(/MONGO_INITDB_DATABASE:\s*(\w+)/);
-    return dbNameMatch ? dbNameMatch[1] : projectName;
-  } catch (error) {
-    // Fallback to project name on error
-    return projectName;
+    const databaseName = dbNameMatch ? dbNameMatch[1] : projectName;
+    
+    // Extract username
+    const usernameMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_USERNAME:\s*(\w+)/);
+    const username = usernameMatch ? usernameMatch[1] : config.database.user;
+    
+    // Extract password
+    const passwordMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_PASSWORD:\s*([^\s]+)/);
+    const password = passwordMatch ? passwordMatch[1] : config.database.password;
+    
+    if (!username || !password) {
+      throw new Error(`Could not extract MongoDB credentials from docker-compose.yml for project ${projectName}`);
+    }
+    
+    return {
+      databaseName,
+      username,
+      password,
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to read database configuration: ${error.message || error}`);
   }
 }
 
@@ -43,8 +65,9 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     throw new Error("Backup base directory not configured. Please set it in Settings.");
   }
   
-  // Get the actual database name from docker-compose.yml
-  const databaseName = await getDatabaseName(projectName);
+  // Get database configuration from docker-compose.yml
+  const dbConfig = await getDatabaseConfig(projectName);
+  const { databaseName, username: mongoUser, password: mongoPassword } = dbConfig;
   
   // Ensure backup directory exists
   await mkdir(backupBaseDir, { recursive: true });
@@ -73,10 +96,6 @@ export async function createMongoBackup(projectName: string): Promise<string> {
   if (!containerExists) {
     throw new Error(`Database container '${dbContainerName}' not found.`);
   }
-  
-  // Get MongoDB credentials
-  const mongoUser = config.database.user;
-  const mongoPassword = config.database.password;
   
   // Execute mongodump inside the container
   // mongodump will create a dump directory with the database backup
