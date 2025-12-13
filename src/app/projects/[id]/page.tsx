@@ -71,6 +71,46 @@ export default function ProjectDetailPage() {
     fetchEnvComparison();
   }, [projectId]);
 
+  // Suppress browser extension errors and other non-critical errors
+  useEffect(() => {
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    console.error = (...args: any[]) => {
+      const message = args[0]?.toString() || "";
+      // Suppress browser extension errors
+      if (
+        message.includes("moz-extension://") ||
+        message.includes("chrome-extension://") ||
+        message.includes("solanaActionsContentScript") ||
+        message.includes("h1-check.js") ||
+        message.includes("detectStore") ||
+        message.includes("Receiving end does not exist")
+      ) {
+        return; // Suppress these errors
+      }
+      originalError.apply(console, args);
+    };
+    
+    console.warn = (...args: any[]) => {
+      const message = args[0]?.toString() || "";
+      // Suppress browser extension warnings
+      if (
+        message.includes("moz-extension://") ||
+        message.includes("chrome-extension://") ||
+        message.includes("solanaActionsContentScript")
+      ) {
+        return; // Suppress these warnings
+      }
+      originalWarn.apply(console, args);
+    };
+    
+    return () => {
+      console.error = originalError;
+      console.warn = originalWarn;
+    };
+  }, []);
+
   // Real-time metrics stream using Server-Sent Events
   useEffect(() => {
     // Only stream if enabled, project is loaded and no actions are in progress
@@ -134,8 +174,16 @@ export default function ProjectDetailPage() {
           }
         }
       } catch (error: any) {
-        // Only log non-network errors (network errors are normal when streams are aborted)
-        if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+        // Suppress network errors and stream errors (normal when streams are aborted during navigation)
+        const isNetworkError = 
+          error?.name === "NetworkError" || 
+          error?.message?.includes("NetworkError") ||
+          error?.message?.includes("fetch resource") ||
+          error?.message?.includes("input stream") ||
+          error?.message?.includes("aborted") ||
+          error?.message?.includes("cancelled");
+        
+        if (!isNetworkError) {
           console.error("Error in metrics stream:", error);
         }
         // Silently reconnect after a delay
@@ -171,8 +219,13 @@ export default function ProjectDetailPage() {
         setLastRefresh(new Date());
       }
     } catch (error: any) {
-      // Only log non-network errors (network errors are normal during navigation)
-      if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+      // Suppress network errors (normal during navigation)
+      const isNetworkError = 
+        error?.name === "NetworkError" || 
+        error?.message?.includes("NetworkError") ||
+        error?.message?.includes("fetch resource");
+      
+      if (!isNetworkError) {
         console.error("Error fetching project:", error);
       }
     } finally {
@@ -214,7 +267,7 @@ export default function ProjectDetailPage() {
         });
 
         if (!response.ok) {
-          console.error("Logs stream response not OK:", response.status);
+          // Don't log 4xx/5xx errors as they're handled silently
           throw new Error("Failed to connect to logs stream");
         }
 
@@ -278,8 +331,16 @@ export default function ProjectDetailPage() {
           }
         }
       } catch (error: any) {
-        // Only log non-network errors (network errors are normal when streams are aborted)
-        if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
+        // Suppress network errors and stream errors (normal when streams are aborted during navigation)
+        const isNetworkError = 
+          error?.name === "NetworkError" || 
+          error?.message?.includes("NetworkError") ||
+          error?.message?.includes("fetch resource") ||
+          error?.message?.includes("input stream") ||
+          error?.message?.includes("aborted") ||
+          error?.message?.includes("cancelled");
+        
+        if (!isNetworkError) {
           console.error("Error in logs stream:", error);
         }
         setLogsStreamActive(false);
