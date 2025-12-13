@@ -95,12 +95,24 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     
     // Run mongodump inside the container
     // Authenticate with admin database, then dump the specific database
-    const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /tmp/backup`;
+    // Use URI format for better compatibility
+    const mongoUri = `mongodb://${mongoUser}:${encodeURIComponent(mongoPassword)}@localhost:27017/${databaseName}?authSource=admin`;
+    const mongodumpCommand = `docker exec ${dbContainerName} mongodump --uri "${mongoUri}" --out /tmp/backup`;
     
-    await execAsync(mongodumpCommand, {
-      shell: "/bin/sh",
-      env: { ...process.env },
-    });
+    try {
+      await execAsync(mongodumpCommand, {
+        shell: "/bin/sh",
+        env: { ...process.env },
+      });
+    } catch (dumpError: any) {
+      // If specific database dump fails, try dumping all databases
+      console.warn(`Failed to dump specific database ${databaseName}, trying all databases:`, dumpError.message);
+      const allDbsCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --out /tmp/backup`;
+      await execAsync(allDbsCommand, {
+        shell: "/bin/sh",
+        env: { ...process.env },
+      });
+    }
     
     // Copy the backup from container to host
     const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName} ${backupPath}`;
