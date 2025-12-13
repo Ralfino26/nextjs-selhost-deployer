@@ -120,11 +120,44 @@ export function DeployModal({
         toast.error("No logs to copy");
         return;
       }
-      await navigator.clipboard.writeText(allLogs);
-      toast.success("Logs copied to clipboard");
+
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(allLogs);
+          toast.success("Logs copied to clipboard");
+          return;
+        } catch (clipboardError) {
+          console.warn("Clipboard API failed, trying fallback:", clipboardError);
+        }
+      }
+
+      // Fallback: use execCommand for older browsers or HTTP
+      const textArea = document.createElement("textarea");
+      textArea.value = allLogs;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast.success("Logs copied to clipboard");
+        } else {
+          throw new Error("execCommand('copy') failed");
+        }
+      } catch (execError) {
+        document.body.removeChild(textArea);
+        throw execError;
+      }
     } catch (error) {
       console.error("Failed to copy logs:", error);
-      toast.error("Failed to copy logs");
+      toast.error("Failed to copy logs. Please select and copy manually.");
     }
   };
 
