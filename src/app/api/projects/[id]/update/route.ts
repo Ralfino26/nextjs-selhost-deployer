@@ -54,10 +54,21 @@ export async function POST(
       );
     }
 
-    // If it's a GitHub URL and we have a token, update it
-    if (remoteUrl.includes("github.com") && config.githubToken) {
+    // If it's a GitHub URL, we MUST use a token
+    if (remoteUrl.includes("github.com")) {
+      // Check if we have a token (from config or env)
+      const githubToken = config.githubToken || process.env.GITHUB_TOKEN;
+      
+      if (!githubToken) {
+        console.error("[GIT PULL] GitHub repository detected but no token configured");
+        return NextResponse.json(
+          { error: "GitHub token is required for GitHub repositories. Please configure it in Settings." },
+          { status: 400 }
+        );
+      }
+      
       console.log(`[GIT PULL] GitHub repository detected, updating remote URL with token...`);
-      // Extract repo path from URL
+      // Extract repo path from URL (always extract, even if URL already has a token)
       let repoPathFromUrl = remoteUrl;
       
       if (repoPathFromUrl.startsWith("git@")) {
@@ -91,7 +102,8 @@ export async function POST(
       }
 
       // Update remote URL with token (same format as used in clone)
-      const newUrl = `https://${config.githubToken}@github.com/${repoPathFromUrl}.git`;
+      // ALWAYS update, even if URL already has a token, to ensure we use the correct token
+      const newUrl = `https://${githubToken}@github.com/${repoPathFromUrl}.git`;
       console.log(`[GIT PULL] Updating remote URL from: ${remoteUrl.replace(/https:\/\/[^@]+@/, "https://***@")} to: https://***@github.com/${repoPathFromUrl}.git`);
       
       try {
@@ -110,6 +122,15 @@ export async function POST(
         });
         const verifiedUrl = verifyRemoteResult.stdout.trim();
         console.log(`[GIT PULL] Verified remote URL: ${verifiedUrl.replace(/https:\/\/[^@]+@/, "https://***@")}`);
+        
+        // Double-check that the token is in the URL
+        if (!verifiedUrl.includes("@github.com")) {
+          console.error("[GIT PULL] Token not found in verified remote URL!");
+          return NextResponse.json(
+            { error: "Failed to set GitHub token in remote URL" },
+            { status: 500 }
+          );
+        }
       } catch (error: any) {
         console.error("[GIT PULL] Failed to update remote URL:", error);
         return NextResponse.json(
@@ -117,8 +138,6 @@ export async function POST(
           { status: 500 }
         );
       }
-    } else if (remoteUrl.includes("github.com") && !config.githubToken) {
-      console.warn("[GIT PULL] GitHub repository detected but no token configured");
     }
 
     // Now pull
