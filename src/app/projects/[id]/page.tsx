@@ -22,6 +22,7 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState("");
+  const [logsStreamActive, setLogsStreamActive] = useState(false);
   const [envVariables, setEnvVariables] = useState<EnvironmentVariable[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -154,6 +155,100 @@ export default function ProjectDetailPage() {
       console.error("Error fetching logs:", error);
     }
   };
+
+  // Real-time logs stream
+  useEffect(() => {
+    if (!project || loading || actionLoading !== null) {
+      return;
+    }
+
+    let isActive = true;
+    let logsReader: ReadableStreamDefaultReader<Uint8Array> | null | undefined = null;
+
+    const connectLogsStream = async () => {
+      try {
+        const auth = sessionStorage.getItem("auth");
+        const response = await fetch(`/api/projects/${projectId}/logs/stream`, {
+          headers: auth ? { Authorization: `Basic ${auth}` } : {},
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to connect to logs stream");
+        }
+
+        const streamReader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!streamReader) {
+          throw new Error("No response body");
+        }
+
+        logsReader = streamReader;
+        setLogsStreamActive(true);
+
+        let buffer = "";
+        let initialLogsReceived = false;
+
+        while (isActive && project && actionLoading === null) {
+          const { done, value } = await logsReader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.log) {
+                  if (!initialLogsReceived) {
+                    // First chunk is the initial logs, replace
+                    setLogs(data.log);
+                    initialLogsReceived = true;
+                  } else {
+                    // Subsequent chunks are new logs, append
+                    setLogs((prev) => prev + data.log);
+                  }
+                  
+                  // Auto-scroll to bottom
+                  setTimeout(() => {
+                    const logElement = document.getElementById("container-logs");
+                    if (logElement) {
+                      logElement.scrollTop = logElement.scrollHeight;
+                    }
+                  }, 100);
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error in logs stream:", error);
+        setLogsStreamActive(false);
+        // Silently reconnect after a delay
+        if (isActive && project && actionLoading === null) {
+          setTimeout(() => {
+            if (isActive && project && actionLoading === null) {
+              connectLogsStream();
+            }
+          }, 3000);
+        }
+      }
+    };
+
+    connectLogsStream();
+
+    return () => {
+      isActive = false;
+      setLogsStreamActive(false);
+      if (logsReader) {
+        logsReader.cancel().catch(() => {});
+      }
+    };
+  }, [project, loading, actionLoading, projectId]);
 
   const fetchEnvVars = async () => {
     try {
@@ -980,14 +1075,25 @@ export default function ProjectDetailPage() {
         </TabsList>
         <TabsContent value="logs" className="mt-4">
           <div className="rounded-md border border-gray-200 bg-white p-4">
-            <div className="mb-2 flex justify-between">
-              <h3 className="font-medium">Container Logs</h3>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium">Container Logs</h3>
+                {logsStreamActive && (
+                  <span className="flex items-center gap-1 text-xs text-green-600">
+                    <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                    Live
+                  </span>
+                )}
+              </div>
               <Button variant="outline" size="sm" onClick={fetchLogs}>
                 Refresh
               </Button>
             </div>
-            <pre className="max-h-96 overflow-auto rounded bg-gray-50 p-4 text-xs text-gray-900">
-              {logs || "No logs available. Click Refresh to load logs."}
+            <pre
+              id="container-logs"
+              className="max-h-96 overflow-auto rounded bg-gray-900 p-4 text-xs text-green-400 font-mono whitespace-pre-wrap"
+            >
+              {logs || "No logs available. Loading..."}
             </pre>
           </div>
         </TabsContent>
