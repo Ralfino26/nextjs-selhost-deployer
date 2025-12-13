@@ -95,25 +95,68 @@ export async function createMongoBackup(projectName: string): Promise<string> {
     // Execute mongodump inside the container to /tmp/backup
     const mongodumpCommand = `docker exec ${dbContainerName} mongodump --authenticationDatabase admin --username ${mongoUser} --password ${mongoPassword} --db ${databaseName} --out /tmp/backup`;
     
-    await execAsync(mongodumpCommand, {
+    console.log(`Running mongodump: ${mongodumpCommand}`);
+    const dumpResult = await execAsync(mongodumpCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
     });
+    console.log(`Mongodump output: ${dumpResult.stdout}`);
+    if (dumpResult.stderr) {
+      console.warn(`Mongodump warnings: ${dumpResult.stderr}`);
+    }
+    
+    // Verify the dump was created in the container
+    const verifyDumpCommand = `docker exec ${dbContainerName} ls -la /tmp/backup/${databaseName}`;
+    try {
+      const verifyResult = await execAsync(verifyDumpCommand, {
+        shell: "/bin/sh",
+        env: { ...process.env },
+      });
+      console.log(`Backup contents in container: ${verifyResult.stdout}`);
+    } catch (verifyError: any) {
+      console.error(`Failed to verify backup in container: ${verifyError.message}`);
+      // Try listing /tmp/backup to see what's there
+      const listBackupCommand = `docker exec ${dbContainerName} ls -la /tmp/backup`;
+      try {
+        const listResult = await execAsync(listBackupCommand, {
+          shell: "/bin/sh",
+          env: { ...process.env },
+        });
+        console.log(`Contents of /tmp/backup: ${listResult.stdout}`);
+      } catch (listError) {
+        console.error(`Failed to list /tmp/backup: ${listError}`);
+      }
+    }
     
     // Copy the backup from container to host backup directory
     const copyCommand = `docker cp ${dbContainerName}:/tmp/backup/${databaseName} ${backupPath}`;
-    await execAsync(copyCommand, {
+    console.log(`Copying backup: ${copyCommand}`);
+    const copyResult = await execAsync(copyCommand, {
       shell: "/bin/sh",
       env: { ...process.env },
     });
+    console.log(`Copy output: ${copyResult.stdout}`);
+    if (copyResult.stderr) {
+      console.warn(`Copy warnings: ${copyResult.stderr}`);
+    }
     
     // Verify backup was created
     if (!existsSync(backupPath)) {
       throw new Error(`Backup directory was not created: ${backupPath}`);
     }
     
+    // List contents to verify
+    const { readdir } = await import("fs/promises");
+    const contents = await readdir(backupPath);
+    console.log(`Backup directory contents: ${contents.join(", ")}`);
+    if (contents.length === 0) {
+      throw new Error(`Backup directory is empty: ${backupPath}`);
+    }
+    
     return backupPath;
   } catch (error: any) {
+    console.error(`Backup error: ${error.message}`);
+    console.error(`Error details:`, error);
     throw new Error(`Failed to create backup: ${error.message || error}`);
   }
 }
