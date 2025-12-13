@@ -15,6 +15,8 @@ interface VisitorStats {
 
 // Track previous network stats to detect active traffic
 let previousNetworkStats: Map<string, { rx: number; tx: number; timestamp: number }> = new Map();
+// Track recent activity windows (last 10 seconds)
+let recentActivityWindows: Map<string, Array<{ bytes: number; timestamp: number }>> = new Map();
 
 // Get active TCP connections for a container
 // Since direct connection counting doesn't work well with NPM, we estimate based on network activity
@@ -244,7 +246,8 @@ export async function getActiveConnections(projectName: string, port: number): P
       }
     }
 
-    // If all direct methods fail, estimate based on network activity
+    // If all direct methods fail, use a better estimation based on recent network activity
+    // This uses a sliding window to smooth out spikes and provide more accurate estimates
     if (totalConnections === 0) {
       try {
         const stats = await container.stats({ stream: false });
@@ -259,25 +262,50 @@ export async function getActiveConnections(projectName: string, port: number): P
             totalTx += network.tx_bytes || 0;
           }
           
-          // Get previous stats
-          const previous = previousNetworkStats.get(projectName);
           const now = Date.now();
+          const previous = previousNetworkStats.get(projectName);
           
           if (previous) {
             const timeDiff = (now - previous.timestamp) / 1000; // seconds
-            if (timeDiff > 0) {
+            if (timeDiff > 0 && timeDiff < 10) { // Only if recent (within 10 seconds)
               const rxDiff = totalRx - previous.rx;
               const txDiff = totalTx - previous.tx;
               const totalDiff = rxDiff + txDiff;
               
-              // If there's significant traffic in the last few seconds, estimate active connections
-              // Rough estimate: ~1KB per second per active user = 1 connection
-              const bytesPerSecond = totalDiff / timeDiff;
-              const estimatedConnections = Math.floor(bytesPerSecond / 1024); // 1KB/s per connection
+              // Add to sliding window (keep last 10 seconds)
+              let window = recentActivityWindows.get(projectName) || [];
+              window.push({ bytes: totalDiff, timestamp: now });
               
-              if (estimatedConnections > 0) {
-                console.log(`[Visitor] Method 7 (network activity): ${estimatedConnections} estimated connections (${bytesPerSecond.toFixed(0)} bytes/s)`);
-                totalConnections = estimatedConnections;
+              // Remove entries older than 10 seconds
+              const tenSecondsAgo = now - 10000;
+              window = window.filter(entry => entry.timestamp > tenSecondsAgo);
+              recentActivityWindows.set(projectName, window);
+              
+              // Calculate average bytes per second over the window
+              if (window.length > 0) {
+                const totalBytes = window.reduce((sum, entry) => sum + entry.bytes, 0);
+                const windowDuration = (now - window[0].timestamp) / 1000;
+                const avgBytesPerSecond = windowDuration > 0 ? totalBytes / windowDuration : 0;
+                
+                // Better estimation:
+                // - Small web page load: ~50-100KB = ~1 connection
+                // - Active browsing: ~5-10KB/s = ~1 connection
+                // - Idle but connected: ~0.5-1KB/s = ~0.5 connection (round to 1)
+                // Use a more conservative estimate: 10KB/s per active connection
+                const estimatedConnections = Math.max(0, Math.floor(avgBytesPerSecond / 10240));
+                
+                // Also check if there's any recent activity at all (even small)
+                // If there's any activity in the last 10 seconds, show at least 1 if user is actively browsing
+                const hasRecentActivity = avgBytesPerSecond > 500; // 500 bytes/s threshold
+                
+                if (hasRecentActivity && estimatedConnections === 0) {
+                  // User is browsing but low activity, show 1
+                  totalConnections = 1;
+                  console.log(`[Visitor] Method 7 (network activity - low): 1 connection (${avgBytesPerSecond.toFixed(0)} bytes/s avg)`);
+                } else if (estimatedConnections > 0) {
+                  totalConnections = estimatedConnections;
+                  console.log(`[Visitor] Method 7 (network activity): ${estimatedConnections} estimated connections (${avgBytesPerSecond.toFixed(0)} bytes/s avg over ${window.length} samples)`);
+                }
               }
             }
           }
