@@ -29,22 +29,103 @@ export default function ProjectDetailPage() {
   const [deployLogs, setDeployLogs] = useState<string>("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [metricsStream, setMetricsStream] = useState<EventSource | null>(null);
 
   useEffect(() => {
     fetchProject();
     fetchEnvVars();
   }, [projectId]);
 
-  // Auto-refresh metrics every 5 seconds
+  // Real-time metrics stream using Server-Sent Events
   useEffect(() => {
-    // Only auto-refresh if enabled, project is loaded and no actions are in progress
-    if (!autoRefresh || !project || actionLoading !== null || loading) return;
+    // Only stream if enabled, project is loaded and no actions are in progress
+    if (!autoRefresh || !project || actionLoading !== null || loading) {
+      if (metricsStream) {
+        metricsStream.close();
+        setMetricsStream(null);
+      }
+      return;
+    }
 
-    const interval = setInterval(() => {
-      fetchProject(true); // Silent refresh - don't set loading state
-    }, 5000); // Refresh every 5 seconds
+    const auth = sessionStorage.getItem("auth");
+    const authHeader = auth ? `Basic ${auth}` : "";
 
-    return () => clearInterval(interval);
+    // Create EventSource for real-time metrics
+    const eventSource = new EventSource(`/api/projects/${projectId}/metrics/stream`, {
+      withCredentials: false,
+    });
+
+    // Note: EventSource doesn't support custom headers, so we'll need to handle auth differently
+    // For now, we'll use a workaround with a query parameter or handle it server-side
+    // Actually, let's use fetch with ReadableStream instead
+
+    const connectStream = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/metrics/stream`, {
+          headers: authHeader ? { Authorization: authHeader } : {},
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to connect to metrics stream");
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error("No response body");
+        }
+
+        while (autoRefresh && project && actionLoading === null) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                // Update project with new metrics
+                setProject((prev) => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    status: data.status || prev.status,
+                    containerMetrics: data.containerMetrics || prev.containerMetrics,
+                    containerHealth: data.containerHealth || prev.containerHealth,
+                    lastDeployment: data.lastDeployment || prev.lastDeployment,
+                  };
+                });
+                setLastRefresh(new Date());
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+
+        reader.cancel();
+      } catch (error) {
+        console.error("Error in metrics stream:", error);
+        // Fallback to polling if SSE fails
+        const interval = setInterval(() => {
+          if (autoRefresh && project && actionLoading === null) {
+            fetchProject(true);
+          }
+        }, 2000);
+        return () => clearInterval(interval);
+      }
+    };
+
+    connectStream();
+
+    return () => {
+      if (metricsStream) {
+        metricsStream.close();
+      }
+    };
   }, [autoRefresh, project, actionLoading, loading, projectId]);
 
   const fetchProject = async (silent = false) => {
