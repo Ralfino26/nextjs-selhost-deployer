@@ -123,15 +123,19 @@ export async function restartProject(projectName: string): Promise<void> {
   });
 }
 
-// Restart database without losing data (just restarts the container)
+// Restart database without losing data (down && up -d, preserves volumes)
 export async function restartDatabase(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const databaseDir = join(projectDir, "database");
 
   try {
-    // Use docker compose restart to restart the database container
-    // This preserves volumes and data
-    await execAsync(`docker compose restart`, {
+    // Use docker compose down && up -d to fully restart the database
+    // This preserves volumes (no -v flag) and applies any config changes
+    await execAsync(`docker compose down`, {
+      cwd: databaseDir,
+    });
+    
+    await execAsync(`docker compose up -d`, {
       cwd: databaseDir,
     });
   } catch (error) {
