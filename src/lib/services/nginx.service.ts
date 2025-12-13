@@ -60,12 +60,18 @@ async function getNPMToken(): Promise<string> {
 
 async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
   // Return cached hosts if available (cache for 5 minutes)
-  if (npmProxyHosts && Date.now() < npmTokenExpiry - 300000) {
+  // But only if token is still valid
+  if (npmProxyHosts && npmToken && Date.now() < npmTokenExpiry - 300000) {
     return npmProxyHosts;
   }
 
   const { config } = await import("../config");
   const npmUrl = config.npmUrl || process.env.NPM_URL || "http://nginx-proxy-manager:81";
+  
+  if (!npmUrl) {
+    throw new Error("NPM URL not configured. Please set it in Settings.");
+  }
+  
   const token = await getNPMToken();
 
   try {
@@ -78,13 +84,22 @@ async function getNPMProxyHosts(): Promise<NPMProxyHost[]> {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch proxy hosts: ${response.statusText}`);
+      // Clear cache on error
+      npmProxyHosts = null;
+      if (response.status === 401) {
+        // Token expired, clear it
+        npmToken = null;
+        npmTokenExpiry = 0;
+      }
+      throw new Error(`Failed to fetch proxy hosts: ${response.statusText} (${response.status})`);
     }
 
     const data = await response.json();
     npmProxyHosts = data.filter((host: NPMProxyHost) => host.enabled) as NPMProxyHost[];
     return npmProxyHosts;
   } catch (error: any) {
+    // Clear cache on error
+    npmProxyHosts = null;
     throw new Error(`Failed to get NPM proxy hosts: ${error?.message || error}`);
   }
 }
