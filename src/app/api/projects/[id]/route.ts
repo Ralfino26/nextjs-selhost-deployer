@@ -226,10 +226,18 @@ export async function GET(
           const portMatch = databaseComposeContent.match(/ports:\s*-\s*"(\d+):/);
           const imageMatch = databaseComposeContent.match(/image:\s*([^\s]+)/);
           
+          // Extract credentials from docker-compose.yml (same as backup service)
+          const usernameMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_USERNAME:\s*(\w+)/);
+          const passwordMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_PASSWORD:\s*([^\s]+)/);
+          
           const databaseName = dbNameMatch ? dbNameMatch[1] : projectName;
-          const databasePort = portMatch ? parseInt(portMatch[1], 10) : undefined;
+          const databasePort = portMatch ? parseInt(portMatch[1], 10) : 27027; // Default to 27027 if not found
           const databaseImage = imageMatch ? imageMatch[1] : undefined;
           const databaseVolumePath = join(projectDir, "database", "data");
+          
+          // Get credentials from docker-compose.yml, fallback to config
+          const dbUser = usernameMatch ? usernameMatch[1] : config.database.user;
+          const dbPassword = passwordMatch ? passwordMatch[1] : config.database.password;
           
           // Get database container information
           const dbContainerName = `${projectName}-mongo`;
@@ -258,10 +266,9 @@ export async function GET(
             dbContainerStatus = "Stopped";
           }
           
-          // Generate connection string
-          const dbUser = config.database.user;
-          const dbPassword = config.database.password;
-          const connectionString = `mongodb://${dbUser}:${dbPassword}@${dbContainerName}:27017/${databaseName}`;
+          // Generate connection string in the format: mongodb://username:password@IP:port/database_name?authSource=admin
+          // Use localhost as IP since the database is accessible from the host
+          const connectionString = `mongodb://${dbUser}:${dbPassword}@localhost:${databasePort}/${databaseName}?authSource=admin`;
           
           databaseInfo = {
             containerId: dbContainerId,

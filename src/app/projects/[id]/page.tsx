@@ -1110,17 +1110,58 @@ export default function ProjectDetailPage() {
                 <div className="rounded-md bg-green-50 p-2">
                   <span className="text-xs font-medium text-gray-700">Connection String</span>
                   <div className="mt-1 flex items-center gap-2">
-                    <p className="flex-1 break-all font-mono text-xs text-gray-800">
+                    <p 
+                      className="flex-1 break-all font-mono text-xs text-gray-800 cursor-text select-all"
+                      onClick={(e) => {
+                        const text = e.currentTarget.textContent;
+                        if (text) {
+                          const selection = window.getSelection();
+                          const range = document.createRange();
+                          range.selectNodeContents(e.currentTarget);
+                          selection?.removeAllRanges();
+                          selection?.addRange(range);
+                        }
+                      }}
+                    >
                       {project.database.connectionString}
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(project.database!.connectionString!);
-                        toast.success("Connection string copied to clipboard");
+                      onClick={async () => {
+                        const connectionString = project.database!.connectionString!;
+                        try {
+                          // Try modern clipboard API first
+                          if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(connectionString);
+                            toast.success("Connection string copied to clipboard");
+                            return;
+                          }
+                          
+                          // Fallback: use execCommand
+                          const textArea = document.createElement("textarea");
+                          textArea.value = connectionString;
+                          textArea.style.position = "fixed";
+                          textArea.style.left = "-999999px";
+                          document.body.appendChild(textArea);
+                          textArea.focus();
+                          textArea.select();
+                          
+                          const successful = document.execCommand("copy");
+                          document.body.removeChild(textArea);
+                          
+                          if (successful) {
+                            toast.success("Connection string copied to clipboard");
+                          } else {
+                            throw new Error("execCommand failed");
+                          }
+                        } catch (error) {
+                          toast.error("Failed to copy", {
+                            description: "Please select and copy manually",
+                          });
+                        }
                       }}
-                      className="h-7 border-green-300 bg-white text-xs text-green-700 hover:bg-green-50"
+                      className="h-7 border-green-300 bg-white text-xs text-green-700 hover:bg-green-50 flex-shrink-0"
                     >
                       Copy
                     </Button>
