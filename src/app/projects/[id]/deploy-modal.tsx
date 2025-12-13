@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, X, CheckCircle2, Loader2, ArrowUp, ArrowDown, Maximize2, ExternalLink } from "lucide-react";
+import { Copy, ArrowUp, ArrowDown, Maximize2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 interface DeployModalProps {
