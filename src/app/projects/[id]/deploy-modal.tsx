@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ArrowUp, ArrowDown, Maximize2, ExternalLink, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,6 +33,12 @@ export function DeployModal({
   const [isMaximized, setIsMaximized] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(["building"]));
   const [userCollapsedPhases, setUserCollapsedPhases] = useState<Set<string>>(new Set());
+  const userCollapsedPhasesRef = useRef<Set<string>>(new Set());
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    userCollapsedPhasesRef.current = userCollapsedPhases;
+  }, [userCollapsedPhases]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -103,13 +109,26 @@ export function DeployModal({
 
   // Auto-expand phases when they become active (unless user explicitly collapsed them)
   useEffect(() => {
-    if (deployPhases.building === "active" && !userCollapsedPhases.has("building")) {
-      setExpandedPhases((prev) => new Set(prev).add("building"));
-    }
-    if (deployPhases.deploying === "active" && !userCollapsedPhases.has("deploying")) {
-      setExpandedPhases((prev) => new Set(prev).add("deploying"));
-    }
-  }, [deployPhases.building, deployPhases.deploying, userCollapsedPhases]);
+    setExpandedPhases((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      
+      // Auto-expand building phase if active and not user-collapsed
+      if (deployPhases.building === "active" && !userCollapsedPhasesRef.current.has("building") && !next.has("building")) {
+        next.add("building");
+        changed = true;
+      }
+      
+      // Auto-expand deploying phase if active and not user-collapsed
+      if (deployPhases.deploying === "active" && !userCollapsedPhasesRef.current.has("deploying") && !next.has("deploying")) {
+        next.add("deploying");
+        changed = true;
+      }
+      
+      // Only return new set if something changed to prevent unnecessary re-renders
+      return changed ? next : prev;
+    });
+  }, [deployPhases.building, deployPhases.deploying]);
 
   const togglePhase = (phaseKey: string) => {
     setExpandedPhases((prev) => {
