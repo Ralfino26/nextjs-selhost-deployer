@@ -70,20 +70,52 @@ export default function SettingsPage() {
     setMessage("");
 
     try {
+      // First, fetch the latest config to ensure we have all fields
+      // This prevents overwriting fields that might have been updated elsewhere
       const auth = sessionStorage.getItem("auth");
+      const latestConfigResponse = await fetch("/api/settings", {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      
+      let latestConfig = config;
+      if (latestConfigResponse.ok) {
+        latestConfig = await latestConfigResponse.json();
+        // Merge with current form state to preserve any unsaved changes
+        latestConfig = { ...latestConfig, ...config };
+      }
+
+      // Ensure all required fields are present with defaults if missing
+      const configToSave: Config = {
+        githubToken: latestConfig.githubToken || "",
+        mongoUser: latestConfig.mongoUser || "ralf",
+        mongoPassword: latestConfig.mongoPassword || "supersecret",
+        mongoDefaultDatabase: latestConfig.mongoDefaultDatabase || "admin",
+        projectsBaseDir: latestConfig.projectsBaseDir || "/srv/vps/websites",
+        backupBaseDir: latestConfig.backupBaseDir || "/srv/vps/backups",
+        startingPort: latestConfig.startingPort || 5000,
+        websitesNetwork: latestConfig.websitesNetwork || "websites_network",
+        infraNetwork: latestConfig.infraNetwork || "infra_network",
+        npmUrl: latestConfig.npmUrl || "http://nginx-proxy-manager:81",
+        npmEmail: latestConfig.npmEmail || "",
+        npmPassword: latestConfig.npmPassword || "",
+      };
+
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(auth ? { Authorization: `Basic ${auth}` } : {}),
         },
-        body: JSON.stringify(config),
+        body: JSON.stringify(configToSave),
       });
 
       if (response.ok) {
         setMessage("Settings saved successfully");
+        // Reload config to ensure UI is in sync
+        await fetchConfig();
       } else {
-        setMessage("Failed to save settings");
+        const errorData = await response.json().catch(() => ({}));
+        setMessage(`Failed to save settings: ${errorData.error || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Error saving config:", error);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, rename, unlink } from "fs/promises";
 import { join } from "path";
 import { z } from "zod";
 import { clearConfigCache } from "@/lib/config";
@@ -58,7 +58,41 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const config = configSchema.parse(body);
+    
+    // Load existing config first to preserve values that aren't being updated
+    let existingConfig: any = {};
+    try {
+      const content = await readFile(CONFIG_FILE, "utf-8");
+      existingConfig = JSON.parse(content);
+      console.log("[SETTINGS] Loaded existing config");
+    } catch {
+      // Config file doesn't exist, use defaults
+      existingConfig = {
+        githubToken: "",
+        mongoUser: "ralf",
+        mongoPassword: "supersecret",
+        mongoDefaultDatabase: "admin",
+        projectsBaseDir: "/srv/vps/websites",
+        backupBaseDir: "/srv/vps/backups",
+        startingPort: 5000,
+        websitesNetwork: "websites_network",
+        infraNetwork: "infra_network",
+        npmUrl: process.env.NPM_URL || "http://nginx-proxy-manager:81",
+        npmEmail: process.env.NPM_EMAIL || "",
+        npmPassword: process.env.NPM_PASSWORD || "",
+      };
+      console.log("[SETTINGS] Using defaults (no existing config)");
+    }
+
+    // Merge: only update fields that are provided in the request body
+    // This allows partial updates without losing existing values
+    const mergedConfig = {
+      ...existingConfig,
+      ...body, // Override with new values from request
+    };
+
+    // Validate the merged config
+    const config = configSchema.parse(mergedConfig);
 
     // Ensure data directory exists
     const { mkdir } = await import("fs/promises");
@@ -72,15 +106,35 @@ export async function POST(request: NextRequest) {
       npmPassword: config.npmPassword || "",
     };
 
-    // Save to file
-    await writeFile(CONFIG_FILE, JSON.stringify(configToSave, null, 2), "utf-8");
+    console.log("[SETTINGS] Saving config with fields:", Object.keys(configToSave));
+    console.log("[SETTINGS] Config values (sensitive fields masked):", {
+      ...configToSave,
+      githubToken: configToSave.githubToken ? "***" : "",
+      mongoPassword: configToSave.mongoPassword ? "***" : "",
+      npmPassword: configToSave.npmPassword ? "***" : "",
+    });
+    
+    // Atomic write: write to temp file first, then rename
+    // This prevents corruption if the process crashes during write
+    const tempFile = `${CONFIG_FILE}.tmp`;
+    try {
+      await writeFile(tempFile, JSON.stringify(configToSave, null, 2), "utf-8");
+      await rename(tempFile, CONFIG_FILE);
+      console.log("[SETTINGS] Config saved successfully (atomic write)");
+    } catch (writeError) {
+      // Clean up temp file if rename failed
+      try {
+        await unlink(tempFile).catch(() => {});
+      } catch {}
+      throw writeError;
+    }
 
     // Clear config cache so new values are loaded
     clearConfigCache();
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error saving settings:", error);
+    console.error("[SETTINGS] Error saving settings:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid settings data", details: error.errors },
