@@ -90,12 +90,28 @@ export async function createMongoBackup(projectName: string): Promise<string> {
   await mkdir(backupPath, { recursive: true });
   
   // Get Docker instance to check if container exists
-  const docker = await getDocker();
+  let docker;
+  try {
+    docker = await getDocker();
+  } catch (error: any) {
+    throw new Error(`Failed to connect to Docker: ${error.message || error}`);
+  }
+  
   try {
     const container = docker.getContainer(dbContainerName);
-    await container.inspect();
-  } catch (error) {
-    throw new Error(`Database container '${dbContainerName}' not found. Make sure the database is running.`);
+    const containerInfo = await container.inspect();
+    
+    // Check if container is running
+    if (!containerInfo.State.Running) {
+      throw new Error(`Database container '${dbContainerName}' is not running. Current state: ${containerInfo.State.Status}`);
+    }
+    
+    console.log(`Container ${dbContainerName} is running`);
+  } catch (error: any) {
+    if (error.message && error.message.includes("is not running")) {
+      throw error;
+    }
+    throw new Error(`Database container '${dbContainerName}' not found. Make sure the database is running. Error: ${error.message || error}`);
   }
   
   // Run mongodump in the container and copy output to host
