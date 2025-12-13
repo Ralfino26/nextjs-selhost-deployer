@@ -35,57 +35,7 @@ export async function GET(
         const docker = await getDocker();
         const container = docker.getContainer(projectName);
 
-        // First, get the last 100 lines to show current state
-        try {
-          const initialLogs = await container.logs({
-            stdout: true,
-            stderr: true,
-            tail: 100,
-            timestamps: false,
-          });
-
-          let logOutput = initialLogs.toString("utf-8");
-          logOutput = logOutput.replace(/\x1b\[[0-9;]*m/g, ""); // Remove ANSI codes
-          
-          // Docker logs returns oldest first, but we want newest at the bottom
-          // Split by lines and take the last 100 lines
-          const lines = logOutput.split("\n");
-          const lastLines = lines.slice(-100).join("\n");
-          
-          // Send initial logs (already in correct order - newest at end)
-          if (lastLines) {
-            sendLog(lastLines);
-          }
-        } catch (error) {
-          // If container doesn't exist, try docker compose logs
-          try {
-            const { config } = await import("@/lib/config");
-            const { join } = await import("path");
-            const { exec } = await import("child_process");
-            const { promisify } = await import("util");
-            const execAsync = promisify(exec);
-
-            const projectDir = join(config.projectsBaseDir, projectName);
-            const dockerComposeDir = join(projectDir, "docker");
-
-            const result = await execAsync(
-              `docker compose logs --tail=100`,
-              { cwd: dockerComposeDir }
-            );
-
-            const logOutput = (result.stdout || result.stderr || "").replace(/\x1b\[[0-9;]*m/g, "");
-            // docker compose logs also returns oldest first, so take last lines
-            const lines = logOutput.split("\n");
-            const lastLines = lines.slice(-100).join("\n");
-            if (lastLines) {
-              sendLog(lastLines);
-            }
-          } catch (composeError) {
-            sendLog("No logs available");
-          }
-        }
-
-        // Now stream new logs in real-time using polling (more reliable than Docker stream)
+        // Stream new logs in real-time using polling
         if (isActive) {
           let lastLogLines: string[] = [];
           let lastLineCount = 0;
