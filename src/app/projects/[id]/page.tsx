@@ -313,7 +313,6 @@ export default function ProjectDetailPage() {
 
   const handleDeploy = async () => {
     setActionLoading("deploy");
-    setActionMessage(null);
     setShowDeployLogs(true);
     setDeployLogs("");
     // Reset phases
@@ -420,7 +419,9 @@ export default function ProjectDetailPage() {
     } catch (error: any) {
       console.error("Error deploying:", error);
       setDeployLogs((prev) => prev + `\n\n❌ Error: ${error.message}\n`);
-      setActionMessage({ type: "error", text: error.message || "Failed to deploy project" });
+      toast.error("Deployment failed", {
+        description: error.message || "Failed to deploy project",
+      });
       setActionLoading(null);
     }
   };
@@ -452,7 +453,6 @@ export default function ProjectDetailPage() {
 
   const handleRestart = async () => {
     setActionLoading("restart");
-    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/restart`, {
@@ -461,15 +461,21 @@ export default function ProjectDetailPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setActionMessage({ type: "success", text: data.message || "Project restarted successfully" });
+        toast.success("Project restarted", {
+          description: data.message || "Container has been restarted",
+        });
         await fetchProject();
       } else {
         const error = await response.json();
-        setActionMessage({ type: "error", text: error.error || "Failed to restart project" });
+        toast.error("Restart failed", {
+          description: error.error || "Failed to restart project",
+        });
       }
     } catch (error) {
       console.error("Error restarting:", error);
-      setActionMessage({ type: "error", text: "Failed to restart project" });
+      toast.error("Restart failed", {
+        description: "Failed to restart project",
+      });
     } finally {
       setActionLoading(null);
     }
@@ -998,20 +1004,11 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {actionMessage && (
-        <div className={`mb-4 rounded-md p-3 ${
-          actionMessage.type === "success" 
-            ? "bg-green-50 text-green-800" 
-            : "bg-red-50 text-red-800"
-        }`}>
-          {actionMessage.text}
-        </div>
-      )}
 
-      {/* Deploy Logs Modal - Netlify Style */}
+      {/* Deploy Logs Modal - Modern Professional Design */}
       {showDeployLogs && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity"
           onClick={(e) => {
             if (e.target === e.currentTarget && actionLoading !== "deploy") {
               setShowDeployLogs(false);
@@ -1026,13 +1023,15 @@ export default function ProjectDetailPage() {
             }
           }}
         >
-          <div className="w-full max-w-6xl rounded-lg bg-white shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+          <div className="w-full max-w-6xl rounded-xl bg-white shadow-2xl border border-gray-200 max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white px-6 py-4">
               <div className="flex items-center gap-3">
-                <div className={`h-2 w-2 rounded-full ${
-                  actionLoading === "deploy" ? "bg-yellow-500 animate-pulse" : "bg-green-500"
-                }`} />
+                {actionLoading === "deploy" ? (
+                  <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                )}
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Deploying {project?.name}</h2>
                   <p className="text-xs text-gray-500 mt-0.5">
@@ -1040,163 +1039,126 @@ export default function ProjectDetailPage() {
                   </p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowDeployLogs(false);
-                  setDeployLogs("");
-                  setDeployPhases({
-                    initializing: "pending",
-                    building: "pending",
-                    deploying: "pending",
-                    cleanup: "pending",
-                    postProcessing: "pending",
-                  });
-                }}
-                className="h-8 w-8 p-0"
-              >
-                ✕
-              </Button>
+              <div className="flex items-center gap-2">
+                {deployLogs && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(deployLogs);
+                        toast.success("Logs copied to clipboard");
+                      } catch (error) {
+                        toast.error("Failed to copy logs");
+                      }
+                    }}
+                    className="h-8 gap-2"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy logs
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowDeployLogs(false);
+                    setDeployLogs("");
+                    setDeployPhases({
+                      initializing: "pending",
+                      building: "pending",
+                      deploying: "pending",
+                      cleanup: "pending",
+                      postProcessing: "pending",
+                    });
+                  }}
+                  className="h-8 w-8 p-0"
+                  disabled={actionLoading === "deploy"}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
-            {/* Deployment Phases - Netlify Style */}
-            <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-              <div className="space-y-2">
-                {/* Initializing */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
-                    deployPhases.initializing === "complete" 
-                      ? "bg-green-500 text-white" 
-                      : deployPhases.initializing === "active"
-                      ? "bg-yellow-500 text-white animate-pulse"
-                      : "bg-gray-300 text-gray-600"
-                  }`}>
-                    {deployPhases.initializing === "complete" ? "✓" : deployPhases.initializing === "active" ? "⟳" : "○"}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">Initializing</span>
-                      {deployPhases.initializing === "complete" && (
-                        <span className="text-xs text-green-600 font-medium">Complete</span>
-                      )}
+            {/* Deployment Phases - Modern Design */}
+            <div className="border-b border-gray-200 bg-gray-50/50 px-6 py-4">
+              <div className="grid grid-cols-5 gap-4">
+                {[
+                  { key: "initializing", label: "Initializing" },
+                  { key: "building", label: "Building" },
+                  { key: "deploying", label: "Deploying" },
+                  { key: "cleanup", label: "Cleanup" },
+                  { key: "postProcessing", label: "Post-processing" },
+                ].map((phase) => {
+                  const phaseState = deployPhases[phase.key as keyof typeof deployPhases];
+                  return (
+                    <div key={phase.key} className="flex flex-col items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                        phaseState === "complete" 
+                          ? "bg-green-500 text-white shadow-lg shadow-green-500/50" 
+                          : phaseState === "active"
+                          ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50 animate-pulse"
+                          : "bg-gray-200 text-gray-400"
+                      }`}>
+                        {phaseState === "complete" ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : phaseState === "active" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Circle className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-medium ${
+                          phaseState === "complete" 
+                            ? "text-green-600" 
+                            : phaseState === "active"
+                            ? "text-blue-600"
+                            : "text-gray-400"
+                        }`}>
+                          {phase.label}
+                        </p>
+                        {phaseState === "complete" && (
+                          <p className="text-[10px] text-green-600 mt-0.5">Complete</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Building */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
-                    deployPhases.building === "complete" 
-                      ? "bg-green-500 text-white" 
-                      : deployPhases.building === "active"
-                      ? "bg-yellow-500 text-white animate-pulse"
-                      : "bg-gray-300 text-gray-600"
-                  }`}>
-                    {deployPhases.building === "complete" ? "✓" : deployPhases.building === "active" ? "⟳" : "○"}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">Building</span>
-                      {deployPhases.building === "complete" && (
-                        <span className="text-xs text-green-600 font-medium">Complete</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Deploying */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
-                    deployPhases.deploying === "complete" 
-                      ? "bg-green-500 text-white" 
-                      : deployPhases.deploying === "active"
-                      ? "bg-yellow-500 text-white animate-pulse"
-                      : "bg-gray-300 text-gray-600"
-                  }`}>
-                    {deployPhases.deploying === "complete" ? "✓" : deployPhases.deploying === "active" ? "⟳" : "○"}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">Deploying</span>
-                      {deployPhases.deploying === "complete" && (
-                        <span className="text-xs text-green-600 font-medium">Complete</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cleanup */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
-                    deployPhases.cleanup === "complete" 
-                      ? "bg-green-500 text-white" 
-                      : deployPhases.cleanup === "active"
-                      ? "bg-yellow-500 text-white animate-pulse"
-                      : "bg-gray-300 text-gray-600"
-                  }`}>
-                    {deployPhases.cleanup === "complete" ? "✓" : deployPhases.cleanup === "active" ? "⟳" : "○"}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">Cleanup</span>
-                      {deployPhases.cleanup === "complete" && (
-                        <span className="text-xs text-green-600 font-medium">Complete</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Post-processing */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
-                    deployPhases.postProcessing === "complete" 
-                      ? "bg-green-500 text-white" 
-                      : deployPhases.postProcessing === "active"
-                      ? "bg-yellow-500 text-white animate-pulse"
-                      : "bg-gray-300 text-gray-600"
-                  }`}>
-                    {deployPhases.postProcessing === "complete" ? "✓" : deployPhases.postProcessing === "active" ? "⟳" : "○"}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">Post-processing</span>
-                      {deployPhases.postProcessing === "complete" && (
-                        <span className="text-xs text-green-600 font-medium">Complete</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Logs Container */}
-            <div className="bg-gray-900 p-6 flex-1 overflow-hidden flex flex-col">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <span>📋</span>
-                  <span>Live deployment output</span>
+            <div className="bg-[#0d1117] p-6 flex-1 overflow-hidden flex flex-col">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-xs font-medium text-gray-300">Live deployment output</span>
                 </div>
-                {deployLogs && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const logElement = document.getElementById("deploy-logs");
-                      if (logElement) {
-                        logElement.scrollTop = logElement.scrollHeight;
-                      }
-                    }}
-                    className="text-xs text-gray-400 hover:text-gray-300 h-6"
-                  >
-                    Scroll to bottom
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {deployLogs && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const logElement = document.getElementById("deploy-logs");
+                          if (logElement) {
+                            logElement.scrollTop = logElement.scrollHeight;
+                          }
+                        }}
+                        className="text-xs text-gray-400 hover:text-gray-200 h-7"
+                      >
+                        Scroll to bottom
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="relative flex-1 overflow-hidden">
+              <div className="relative flex-1 overflow-hidden rounded-lg border border-gray-800 bg-black">
                 <pre
                   id="deploy-logs"
-                  className="rounded-lg bg-black p-4 text-xs text-green-400 font-mono whitespace-pre-wrap overflow-auto h-full"
+                  className="p-4 text-xs text-[#7ee787] font-mono whitespace-pre-wrap overflow-auto h-full leading-relaxed"
                   style={{ 
                     scrollBehavior: "smooth"
                   }}
@@ -1208,9 +1170,9 @@ export default function ProjectDetailPage() {
                   )}
                 </pre>
                 {actionLoading === "deploy" && (
-                  <div className="absolute bottom-4 right-4 flex items-center gap-2 text-xs text-gray-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                    <span>Streaming...</span>
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2 px-2 py-1 rounded bg-gray-900/80 border border-gray-800">
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs text-gray-300">Streaming...</span>
                   </div>
                 )}
               </div>
@@ -1218,38 +1180,20 @@ export default function ProjectDetailPage() {
 
             {/* Footer */}
             <div className="border-t border-gray-200 bg-gray-50 px-6 py-3">
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>Project: {project?.name}</span>
-                <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-600">Project: <span className="font-medium">{project?.name}</span></span>
+                <div className="flex items-center gap-3">
                   {actionLoading === "deploy" ? (
-                    <span className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                      In progress
-                    </span>
+                    <div className="flex items-center gap-2 text-xs text-blue-600">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="font-medium">In progress</span>
+                    </div>
                   ) : (
-                    <span className="flex items-center gap-2 text-green-600">
-                      <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                      Completed
-                    </span>
+                    <div className="flex items-center gap-2 text-xs text-green-600">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span className="font-medium">Completed</span>
+                    </div>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowDeployLogs(false);
-                      setDeployLogs("");
-                      setDeployPhases({
-                        initializing: "pending",
-                        building: "pending",
-                        deploying: "pending",
-                        cleanup: "pending",
-                        postProcessing: "pending",
-                      });
-                    }}
-                    className="h-7"
-                  >
-                    Close
-                  </Button>
                 </div>
               </div>
             </div>

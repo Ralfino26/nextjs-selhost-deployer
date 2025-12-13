@@ -23,6 +23,7 @@
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "simple-git": "^3.25.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.5",
     "zod": "^3.24.1"
   },
