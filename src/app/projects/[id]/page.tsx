@@ -24,6 +24,12 @@ export default function ProjectDetailPage() {
   const [logs, setLogs] = useState("");
   const [logsStreamActive, setLogsStreamActive] = useState(false);
   const [envVariables, setEnvVariables] = useState<EnvironmentVariable[]>([]);
+  const [envComparison, setEnvComparison] = useState<Array<{
+    key: string;
+    productionValue: string | null;
+    exampleValue: string | null;
+    status: "up-to-date" | "missing-in-production" | "missing-in-example" | "different" | "only-in-production" | "only-in-example";
+  }>>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showDeployLogs, setShowDeployLogs] = useState(false);
@@ -273,6 +279,21 @@ export default function ProjectDetailPage() {
       }
     } catch (error) {
       console.error("Error fetching env vars:", error);
+    }
+  };
+
+  const fetchEnvComparison = async () => {
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/env/compare`, {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEnvComparison(data.comparison || []);
+      }
+    } catch (error) {
+      console.error("Error fetching env comparison:", error);
     }
   };
 
@@ -1109,38 +1130,153 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
         <TabsContent value="env" className="mt-4">
-          <div className="rounded-md border border-gray-200 bg-white p-6">
-            <div className="mb-4 flex justify-between items-center">
-              <h3 className="font-medium">Environment Variables</h3>
-              <Button variant="outline" size="sm" onClick={fetchEnvVars}>
-                Refresh
-              </Button>
-            </div>
-            <div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Key</TableHead>
-                    <TableHead>Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {envVariables.length === 0 ? (
+          <div className="space-y-6">
+            {/* Environment Variables Comparison */}
+            <div className="rounded-md border border-gray-200 bg-white p-6">
+              <div className="mb-4 flex justify-between items-center">
+                <div>
+                  <h3 className="font-medium">Environment Variables Comparison</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Compare production .env with .env.example
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={fetchEnvComparison}>
+                  Refresh
+                </Button>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center text-gray-700">
-                        No environment variables found
-                      </TableCell>
+                      <TableHead>Key</TableHead>
+                      <TableHead>Production Value</TableHead>
+                      <TableHead>Example Value</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ) : (
-                    envVariables.map((env, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{env.key}</TableCell>
-                        <TableCell className="font-mono text-sm">{env.value}</TableCell>
+                  </TableHeader>
+                  <TableBody>
+                    {envComparison.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-gray-700">
+                          No environment variables found or .env.example not available
+                        </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      envComparison.map((item, index) => {
+                        const getStatusBadge = () => {
+                          switch (item.status) {
+                            case "up-to-date":
+                              return (
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                                  ✓ Up to date
+                                </span>
+                              );
+                            case "missing-in-production":
+                              return (
+                                <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">
+                                  ⚠ Missing
+                                </span>
+                              );
+                            case "different":
+                              return (
+                                <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800">
+                                  ↻ Different
+                                </span>
+                              );
+                            case "only-in-production":
+                              return (
+                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+                                  + Only in production
+                                </span>
+                              );
+                            case "only-in-example":
+                              return (
+                                <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
+                                  - Only in example
+                                </span>
+                              );
+                            default:
+                              return null;
+                          }
+                        };
+
+                        return (
+                          <TableRow
+                            key={index}
+                            className={
+                              item.status === "missing-in-production"
+                                ? "bg-yellow-50"
+                                : item.status === "different"
+                                ? "bg-orange-50"
+                                : ""
+                            }
+                          >
+                            <TableCell className="font-medium font-mono text-sm">
+                              {item.key}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {item.productionValue ? (
+                                <span className="text-gray-900">{item.productionValue}</span>
+                              ) : (
+                                <span className="text-gray-400 italic">Not set</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {item.exampleValue ? (
+                                <span className="text-gray-900">{item.exampleValue}</span>
+                              ) : (
+                                <span className="text-gray-400 italic">Not in example</span>
+                              )}
+                            </TableCell>
+                            <TableCell>{getStatusBadge()}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Current Environment Variables (Read-only) */}
+            <div className="rounded-md border border-gray-200 bg-white p-6">
+              <div className="mb-4 flex justify-between items-center">
+                <div>
+                  <h3 className="font-medium">Current Environment Variables</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    All environment variables currently in use (read-only)
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={fetchEnvVars}>
+                  Refresh
+                </Button>
+              </div>
+              <div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Key</TableHead>
+                      <TableHead>Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {envVariables.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center text-gray-700">
+                          No environment variables found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      envVariables.map((env, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium font-mono text-sm">{env.key}</TableCell>
+                          <TableCell className="font-mono text-xs">{env.value}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </div>
         </TabsContent>
