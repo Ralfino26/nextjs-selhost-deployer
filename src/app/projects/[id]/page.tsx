@@ -503,6 +503,43 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleRestartDatabase = async () => {
+    if (!project?.database) {
+      toast.error("No database found", {
+        description: "This project does not have a database",
+      });
+      return;
+    }
+
+    setActionLoading("restart-database");
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/database/restart`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        toast.success("Database restarted", {
+          description: data.message || "Database has been restarted without losing data",
+        });
+        await fetchProject();
+      } else {
+        const error = await response.json();
+        toast.error("Database restart failed", {
+          description: error.error || "Failed to restart database",
+        });
+      }
+    } catch (error) {
+      console.error("Error restarting database:", error);
+      toast.error("Database restart failed", {
+        description: "Failed to restart database",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleBackup = async () => {
     if (!project?.database) {
       toast.error("No database found", {
@@ -1089,9 +1126,10 @@ export default function ProjectDetailPage() {
         isDeploying={actionLoading === "deploy"}
       />
 
-      <div className="mb-6 space-y-4">
-        {/* Deployment Workflow */}
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
+        {/* Website Actions */}
         <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">Website Actions</h3>
           <div className="space-y-4">
             {/* Step 1: Git Pull */}
             <div className="flex items-center gap-4">
@@ -1155,68 +1193,149 @@ export default function ProjectDetailPage() {
                 )}
               </Button>
             </div>
+
+            <div className="border-t border-blue-200"></div>
+
+            {/* Restart Website */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Restart Website
+                </p>
+                <p className="text-xs text-gray-500">
+                  Herstart de website container
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRestart}
+                disabled={actionLoading !== null}
+                className="min-w-[120px]"
+              >
+                {actionLoading === "restart" ? (
+                  <>
+                    <span className="mr-2">⏳</span>
+                    Restarting...
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-2">🔄</span>
+                    Restart
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="border-t border-blue-200"></div>
+
+            {/* Delete Project */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Delete Project
+                </p>
+                <p className="text-xs text-gray-500">
+                  Verwijder project en alle containers
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={actionLoading !== null}
+                className="min-w-[120px]"
+              >
+                {actionLoading === "delete" ? (
+                  <>
+                    <span className="mr-2">⏳</span>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-2">🗑️</span>
+                    Delete
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Utility Actions */}
-        <div className="flex gap-2">
-          {project?.database && (
-            <Button
-              variant="outline"
-              onClick={handleBackup}
-              disabled={actionLoading !== null}
-              className="flex-1"
-            >
-              {actionLoading === "backup" ? (
-                <>
-                  <span className="mr-2">⏳</span>
-                  Backing up...
-                </>
-              ) : (
-                <>
-                  <span className="mr-2">💾</span>
-                  Backup Database
-                </>
-              )}
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={handleRestart}
-            disabled={actionLoading !== null}
-            className="flex-1"
-          >
-            {actionLoading === "restart" ? (
-              <>
-                <span className="mr-2">⏳</span>
-                Restarting...
-              </>
-            ) : (
-              <>
-                <span className="mr-2">🔄</span>
-                Restart
-              </>
-            )}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={actionLoading !== null}
-            className="flex-1"
-          >
-            {actionLoading === "delete" ? (
-              <>
-                <span className="mr-2">⏳</span>
-                Deleting...
-              </>
-            ) : (
-              <>
-                <span className="mr-2">🗑️</span>
-                Delete Project
-              </>
-            )}
-          </Button>
-        </div>
+        {/* Database Actions */}
+        {project?.database ? (
+          <div className="rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-5 shadow-sm">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Database Actions</h3>
+            <div className="space-y-4">
+              {/* Backup Database */}
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700 mb-1">
+                    Backup Database
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Maak een backup van de database
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleBackup}
+                  disabled={actionLoading !== null}
+                  className="min-w-[120px] border-green-300 hover:bg-green-50"
+                >
+                  {actionLoading === "backup" ? (
+                    <>
+                      <span className="mr-2">⏳</span>
+                      Backing up...
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-2">💾</span>
+                      Backup
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="border-t border-green-200"></div>
+
+              {/* Restart Database */}
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700 mb-1">
+                    Restart Database
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Herstart database zonder data te verliezen
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleRestartDatabase}
+                  disabled={actionLoading !== null}
+                  className="min-w-[120px] border-green-300 hover:bg-green-50"
+                >
+                  {actionLoading === "restart-database" ? (
+                    <>
+                      <span className="mr-2">⏳</span>
+                      Restarting...
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-2">🔄</span>
+                      Restart
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-5 shadow-sm">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Database Actions</h3>
+            <p className="text-sm text-gray-500">
+              No database configured for this project
+            </p>
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="logs" className="w-full">

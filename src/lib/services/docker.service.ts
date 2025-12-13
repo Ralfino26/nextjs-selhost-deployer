@@ -123,6 +123,24 @@ export async function restartProject(projectName: string): Promise<void> {
   });
 }
 
+// Restart database without losing data (just restarts the container)
+export async function restartDatabase(projectName: string): Promise<void> {
+  const projectDir = join(config.projectsBaseDir, projectName);
+  const databaseDir = join(projectDir, "database");
+
+  try {
+    // Use docker compose restart to restart the database container
+    // This preserves volumes and data
+    await execAsync(`docker compose restart`, {
+      cwd: databaseDir,
+    });
+  } catch (error) {
+    // Database compose file might not exist
+    console.error(`Failed to restart database for ${projectName}:`, error);
+    throw new Error(`Database not found or failed to restart: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 // Stop a project
 export async function stopProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
