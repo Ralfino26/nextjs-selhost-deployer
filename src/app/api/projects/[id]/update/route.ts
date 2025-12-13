@@ -136,8 +136,22 @@ export async function POST(
     } catch (gitError: any) {
       console.error("Git pull failed:", gitError);
       const errorMessage = gitError.stderr || gitError.message || "Unknown error";
+      
+      // Provide more helpful error messages for common issues
+      let userFriendlyError = errorMessage;
+      if (errorMessage.includes("403") || errorMessage.includes("Write access") || errorMessage.includes("not granted")) {
+        userFriendlyError = `Authentication failed. Please check:
+1. Your GitHub token has 'repo' scope enabled
+2. The token is valid and not expired
+3. The token has access to this repository
+Original error: ${errorMessage}`;
+      } else if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
+        userFriendlyError = `Authentication failed. Please verify your GitHub token in Settings.
+Original error: ${errorMessage}`;
+      }
+      
       return NextResponse.json(
-        { error: `Failed to update repository: ${errorMessage}` },
+        { error: `Failed to update repository: ${userFriendlyError}` },
         { status: 500 }
       );
     }
