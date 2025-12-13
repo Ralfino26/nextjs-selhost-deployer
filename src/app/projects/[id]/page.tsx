@@ -429,7 +429,6 @@ export default function ProjectDetailPage() {
 
   const handleUpdate = async () => {
     setActionLoading("update");
-    setActionMessage(null);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch(`/api/projects/${projectId}/update`, {
