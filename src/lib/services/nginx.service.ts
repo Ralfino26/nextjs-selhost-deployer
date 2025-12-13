@@ -30,6 +30,7 @@ async function getNPMToken(): Promise<string> {
   const npmPassword = config.npmPassword || process.env.NPM_PASSWORD || "";
 
   if (!npmEmail || !npmPassword) {
+    console.error("NPM credentials not configured. npmEmail:", npmEmail ? "set" : "missing", "npmPassword:", npmPassword ? "set" : "missing");
     throw new Error("NPM_EMAIL and NPM_PASSWORD must be configured in Settings");
   }
 
