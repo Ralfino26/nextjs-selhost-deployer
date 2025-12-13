@@ -392,7 +392,9 @@ export default function ProjectDetailPage() {
                   }));
                   deploymentComplete = true;
                   setActionLoading(null);
-                  setActionMessage({ type: "success", text: "Project deployed successfully" });
+                  toast.success("Deployment completed", {
+                    description: `${project?.name} has been deployed successfully`,
+                  });
                   await fetchProject();
                   return;
                 }
@@ -437,15 +439,21 @@ export default function ProjectDetailPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setActionMessage({ type: "success", text: data.message || "Project updated successfully" });
+        toast.success("Project updated", {
+          description: data.message || "Successfully pulled latest changes from GitHub",
+        });
         await fetchProject();
       } else {
         const error = await response.json();
-        setActionMessage({ type: "error", text: error.error || "Failed to update project" });
+        toast.error("Update failed", {
+          description: error.error || "Failed to update project",
+        });
       }
     } catch (error) {
       console.error("Error updating:", error);
-      setActionMessage({ type: "error", text: "Failed to update project" });
+      toast.error("Update failed", {
+        description: "Failed to update project",
+      });
     } finally {
       setActionLoading(null);
     }
@@ -947,8 +955,7 @@ export default function ProjectDetailPage() {
                       size="sm"
                       onClick={() => {
                         navigator.clipboard.writeText(project.database!.connectionString!);
-                        setActionMessage({ type: "success", text: "Connection string copied to clipboard" });
-                        setTimeout(() => setActionMessage(null), 2000);
+                        toast.success("Connection string copied to clipboard");
                       }}
                       className="h-7 border-green-300 bg-white text-xs text-green-700 hover:bg-green-50"
                     >
