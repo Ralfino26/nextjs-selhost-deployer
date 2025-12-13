@@ -88,7 +88,6 @@ export default function ProjectDetailPage() {
                     status: data.status || prev.status,
                     containerMetrics: data.containerMetrics || prev.containerMetrics,
                     containerHealth: data.containerHealth || prev.containerHealth,
-                    visitorStats: data.visitorStats || prev.visitorStats,
                     lastDeployment: data.lastDeployment || prev.lastDeployment,
                   };
                 });

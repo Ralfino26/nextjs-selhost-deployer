@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { config } from "@/lib/config";
 import { getProjectStatus } from "@/lib/services/docker.service";
-import { getVisitorStats } from "@/lib/services/visitor.service";
 import { ProjectDetails } from "@/types/project";
 import { isAuthenticated } from "@/lib/auth";
 import { readFile } from "fs/promises";
