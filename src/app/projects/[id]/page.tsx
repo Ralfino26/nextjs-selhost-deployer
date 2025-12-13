@@ -186,7 +186,6 @@ export default function ProjectDetailPage() {
 
         logsReader = streamReader;
         setLogsStreamActive(true);
-        console.log("Logs stream connected");
 
         let buffer = "";
         let initialLogsReceived = false;
@@ -194,7 +193,14 @@ export default function ProjectDetailPage() {
         while (isActive && project && actionLoading === null) {
           const { done, value } = await logsReader.read();
           if (done) {
-            console.log("Logs stream done");
+            // Stream ended, try to reconnect
+            if (isActive && project && actionLoading === null) {
+              setTimeout(() => {
+                if (isActive && project && actionLoading === null) {
+                  connectLogsStream();
+                }
+              }, 2000);
+            }
             break;
           }
 
@@ -211,11 +217,9 @@ export default function ProjectDetailPage() {
                     // First chunk is the initial logs, replace
                     setLogs(data.log);
                     initialLogsReceived = true;
-                    console.log("Initial logs received");
                   } else {
                     // Subsequent chunks are new logs, append
                     setLogs((prev) => prev + data.log);
-                    console.log("New logs appended");
                   }
                   
                   // Auto-scroll to bottom
@@ -227,7 +231,7 @@ export default function ProjectDetailPage() {
                   }, 100);
                 }
               } catch (e) {
-                console.error("Error parsing log data:", e);
+                // Ignore parse errors
               }
             }
           }
@@ -239,7 +243,6 @@ export default function ProjectDetailPage() {
         if (isActive && project && actionLoading === null) {
           setTimeout(() => {
             if (isActive && project && actionLoading === null) {
-              console.log("Reconnecting logs stream...");
               connectLogsStream();
             }
           }, 3000);
