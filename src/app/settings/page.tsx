@@ -19,6 +19,7 @@ interface Config {
   mongoPassword: string;
   mongoDefaultDatabase: string;
   projectsBaseDir: string;
+  backupBaseDir: string;
   startingPort: number;
   websitesNetwork: string;
   infraNetwork: string;
@@ -34,6 +35,7 @@ export default function SettingsPage() {
     mongoPassword: "supersecret",
     mongoDefaultDatabase: "admin",
     projectsBaseDir: "/srv/vps/websites",
+    backupBaseDir: "/srv/vps/backups",
     startingPort: 5000,
     websitesNetwork: "websites_network",
     infraNetwork: "infra_network",
@@ -224,6 +226,19 @@ export default function SettingsPage() {
                   setConfig({ ...config, projectsBaseDir: e.target.value })
                 }
               />
+            </div>
+            <div>
+              <Label htmlFor="backupBaseDir">Backup Base Directory</Label>
+              <Input
+                id="backupBaseDir"
+                value={config.backupBaseDir}
+                onChange={(e) =>
+                  setConfig({ ...config, backupBaseDir: e.target.value })
+                }
+              />
+              <p className="mt-1 text-xs text-gray-700">
+                Directory where MongoDB backups will be stored
+              </p>
             </div>
             <div>
               <Label htmlFor="startingPort">Starting Port</Label>

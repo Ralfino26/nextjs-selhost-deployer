@@ -503,6 +503,42 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleBackup = async () => {
+    if (!project?.database) {
+      toast.error("No database found", {
+        description: "This project does not have a database to backup",
+      });
+      return;
+    }
+
+    setActionLoading("backup");
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/backup`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        toast.success("Backup created", {
+          description: `Backup saved to: ${data.backupPath}`,
+        });
+      } else {
+        const error = await response.json();
+        toast.error("Backup failed", {
+          description: error.error || "Failed to create backup",
+        });
+      }
+    } catch (error) {
+      console.error("Error creating backup:", error);
+      toast.error("Backup failed", {
+        description: "Failed to create backup",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this project?")) {
       return;
@@ -1124,6 +1160,26 @@ export default function ProjectDetailPage() {
 
         {/* Utility Actions */}
         <div className="flex gap-2">
+          {project?.database && (
+            <Button
+              variant="outline"
+              onClick={handleBackup}
+              disabled={actionLoading !== null}
+              className="flex-1"
+            >
+              {actionLoading === "backup" ? (
+                <>
+                  <span className="mr-2">⏳</span>
+                  Backing up...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">💾</span>
+                  Backup Database
+                </>
+              )}
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handleRestart}

@@ -10,6 +10,7 @@ interface ConfigData {
   mongoPassword: string;
   mongoDefaultDatabase: string;
   projectsBaseDir: string;
+  backupBaseDir: string;
   startingPort: number;
   websitesNetwork: string;
   infraNetwork: string;
@@ -44,6 +45,7 @@ function loadConfig(): ConfigData {
     mongoPassword: "supersecret",
     mongoDefaultDatabase: "admin",
     projectsBaseDir: "/srv/vps/websites",
+    backupBaseDir: "/srv/vps/backups",
     startingPort: 5000,
     websitesNetwork: "websites_network",
     infraNetwork: "infra_network",
@@ -65,6 +67,10 @@ export function clearConfigCache() {
 export const config = {
   get projectsBaseDir(): string {
     return loadConfig().projectsBaseDir;
+  },
+  
+  get backupBaseDir(): string {
+    return loadConfig().backupBaseDir;
   },
   
   get startingPort(): number {
