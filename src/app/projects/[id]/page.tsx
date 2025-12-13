@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { ProjectDetails, EnvironmentVariable } from "@/types/project";
 import { toast } from "sonner";
-import { Copy, X, CheckCircle2, Loader2, Circle, ArrowUp, ArrowDown, Maximize2, ExternalLink } from "lucide-react";
+import { DeployModal } from "./deploy-modal";
 
 export default function ProjectDetailPage() {
   const router = useRouter();
