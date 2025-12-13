@@ -89,6 +89,7 @@ export async function GET(
         if (isActive) {
           let lastLogLines: string[] = [];
           let lastLineCount = 0;
+          let initialPollDone = false;
 
           const pollLogs = async () => {
             if (!isActive) return;
@@ -107,9 +108,10 @@ export async function GET(
 
               // Only send if we have new lines
               if (currentLineCount > lastLineCount) {
-                if (lastLineCount === 0) {
+                if (lastLineCount === 0 || !initialPollDone) {
                   // First time, send all logs (newest at end)
                   sendLog(lines.join("\n") + "\n");
+                  initialPollDone = true;
                 } else {
                   // Send only new lines (the ones that were added)
                   const newLines = lines.slice(lastLineCount);
@@ -123,6 +125,7 @@ export async function GET(
                 // Logs were cleared or container restarted, reset
                 lastLineCount = 0;
                 lastLogLines = [];
+                initialPollDone = false;
               }
             } catch (error) {
               // If container doesn't exist, try docker compose logs
@@ -146,8 +149,9 @@ export async function GET(
                 const currentLineCount = lines.length;
 
                 if (currentLineCount > lastLineCount) {
-                  if (lastLineCount === 0) {
+                  if (lastLineCount === 0 || !initialPollDone) {
                     sendLog(lines.join("\n") + "\n");
+                    initialPollDone = true;
                   } else {
                     const newLines = lines.slice(lastLineCount);
                     if (newLines.length > 0) {
@@ -159,11 +163,13 @@ export async function GET(
                 } else if (currentLineCount < lastLineCount) {
                   lastLineCount = 0;
                   lastLogLines = [];
+                  initialPollDone = false;
                 }
               } catch (composeError) {
                 // Container might be stopped
-                if (lastLineCount === 0) {
+                if (lastLineCount === 0 && !initialPollDone) {
                   sendLog("Container is not running or logs are not available");
+                  initialPollDone = true;
                 }
               }
             }
@@ -175,11 +181,15 @@ export async function GET(
               clearInterval(pollInterval);
               return;
             }
-            pollLogs();
+            pollLogs().catch((error) => {
+              console.error("Error in pollLogs:", error);
+            });
           }, 1000);
 
-          // Initial poll
-          pollLogs();
+          // Initial poll immediately
+          pollLogs().catch((error) => {
+            console.error("Error in initial pollLogs:", error);
+          });
 
           request.signal.addEventListener("abort", () => {
             clearInterval(pollInterval);

@@ -173,6 +173,7 @@ export default function ProjectDetailPage() {
         });
 
         if (!response.ok) {
+          console.error("Logs stream response not OK:", response.status);
           throw new Error("Failed to connect to logs stream");
         }
 
@@ -185,13 +186,17 @@ export default function ProjectDetailPage() {
 
         logsReader = streamReader;
         setLogsStreamActive(true);
+        console.log("Logs stream connected");
 
         let buffer = "";
         let initialLogsReceived = false;
 
         while (isActive && project && actionLoading === null) {
           const { done, value } = await logsReader.read();
-          if (done) break;
+          if (done) {
+            console.log("Logs stream done");
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
@@ -206,9 +211,11 @@ export default function ProjectDetailPage() {
                     // First chunk is the initial logs, replace
                     setLogs(data.log);
                     initialLogsReceived = true;
+                    console.log("Initial logs received");
                   } else {
                     // Subsequent chunks are new logs, append
                     setLogs((prev) => prev + data.log);
+                    console.log("New logs appended");
                   }
                   
                   // Auto-scroll to bottom
@@ -220,7 +227,7 @@ export default function ProjectDetailPage() {
                   }, 100);
                 }
               } catch (e) {
-                // Ignore parse errors
+                console.error("Error parsing log data:", e);
               }
             }
           }
@@ -232,6 +239,7 @@ export default function ProjectDetailPage() {
         if (isActive && project && actionLoading === null) {
           setTimeout(() => {
             if (isActive && project && actionLoading === null) {
+              console.log("Reconnecting logs stream...");
               connectLogsStream();
             }
           }, 3000);
