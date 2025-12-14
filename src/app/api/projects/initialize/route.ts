@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     // Clone repository using gh repo clone (format: "Ralfino26/repo-name")
     const repoName = await cloneRepository(data.repo, projectDir);
 
-    // Write Dockerfile in the repo folder (only if it doesn't exist)
-    await writeDockerfile(projectDir, repoName);
+    // Write Dockerfile in the repo folder (force overwrite to ensure correct lock file handling)
+    await writeDockerfile(projectDir, repoName, true);
 
     // Automatically get next available port
     const port = await getNextAvailablePort();

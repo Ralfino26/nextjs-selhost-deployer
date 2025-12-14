@@ -61,16 +61,19 @@ export async function cloneRepository(
 
 export async function writeDockerfile(
   projectDir: string,
-  repoName: string
+  repoName: string,
+  force: boolean = false
 ): Promise<void> {
   const dockerfilePath = join(projectDir, repoName, "Dockerfile");
   
-  // Check if Dockerfile already exists
-  try {
-    await access(dockerfilePath);
-    return; // Dockerfile exists, don't overwrite
-  } catch {
-    // Dockerfile doesn't exist, create it
+  // Check if Dockerfile already exists (only skip if not forcing)
+  if (!force) {
+    try {
+      await access(dockerfilePath);
+      return; // Dockerfile exists, don't overwrite
+    } catch {
+      // Dockerfile doesn't exist, create it
+    }
   }
 
   const repoPath = join(projectDir, repoName);
@@ -80,6 +83,12 @@ export async function writeDockerfile(
   const packageLockExists = existsSync(join(repoPath, "package-lock.json"));
   const yarnLockExists = existsSync(join(repoPath, "yarn.lock"));
   const pnpmLockExists = existsSync(join(repoPath, "pnpm-lock.yaml"));
+  
+  console.log(`[DOCKERFILE] Detecting package manager for ${repoName}:`);
+  console.log(`[DOCKERFILE]   bun.lock: ${bunLockExists}`);
+  console.log(`[DOCKERFILE]   package-lock.json: ${packageLockExists}`);
+  console.log(`[DOCKERFILE]   yarn.lock: ${yarnLockExists}`);
+  console.log(`[DOCKERFILE]   pnpm-lock.yaml: ${pnpmLockExists}`);
   
   // Default to bun
   let packageManager = "bun";
@@ -187,7 +196,14 @@ EXPOSE 3000
 CMD ${JSON.stringify(startCommand)}
 `;
 
+  console.log(`[DOCKERFILE] Generated Dockerfile for ${repoName}:`);
+  console.log(`[DOCKERFILE]   Package manager: ${packageManager}`);
+  console.log(`[DOCKERFILE]   Base image: ${baseImage}`);
+  console.log(`[DOCKERFILE]   Copy command: ${copyLockFiles}`);
+  console.log(`[DOCKERFILE]   Install command: ${installCommand}`);
+
   await writeFile(dockerfilePath, dockerfileContent);
+  console.log(`[DOCKERFILE] ✓ Dockerfile written to ${dockerfilePath}`);
 }
 
 export async function writeDockerCompose(
