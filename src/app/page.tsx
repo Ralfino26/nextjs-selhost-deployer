@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -33,49 +33,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState<Record<string, "website" | "database" | null>>({});
 
-  // Fetch projects when component mounts or pathname changes (handles navigation)
-  useEffect(() => {
-    if (pathname === "/") {
-      // Always reset and fetch fresh data when on homepage
-      hasFetchedRef.current = false;
-      setProjects([]);
-      setFilteredProjects([]);
-      setLoading(true);
-      fetchProjects();
-    }
-  }, [pathname]);
-
-  // Also handle window focus (when user navigates back via browser back button)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (pathname === "/" && (!hasFetchedRef.current || projects.length === 0)) {
-        hasFetchedRef.current = false;
-        setLoading(true);
-        fetchProjects();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [pathname, projects.length]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProjects(projects);
-    } else {
-      const query = searchQuery.toLowerCase();
-      setFilteredProjects(
-        projects.filter(
-          (project) =>
-            project.name.toLowerCase().includes(query) ||
-            project.repo.toLowerCase().includes(query) ||
-            (project.domain && project.domain.toLowerCase().includes(query))
-        )
-      );
-    }
-  }, [searchQuery, projects]);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     // Always set loading to true at the start
     setLoading(true);
     // Clear existing projects immediately to show loading state
@@ -108,7 +66,55 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Fetch projects when component mounts or pathname changes (handles navigation)
+  useEffect(() => {
+    if (pathname === "/") {
+      // Always reset and fetch fresh data when on homepage
+      hasFetchedRef.current = false;
+      setProjects([]);
+      setFilteredProjects([]);
+      setLoading(true);
+      
+      // Use a small delay to ensure state is reset before fetching
+      const timer = setTimeout(() => {
+        fetchProjects();
+      }, 0);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [pathname, fetchProjects]);
+
+  // Also handle window focus (when user navigates back via browser back button)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (pathname === "/" && (!hasFetchedRef.current || projects.length === 0)) {
+        hasFetchedRef.current = false;
+        setLoading(true);
+        fetchProjects();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [pathname, projects.length, fetchProjects]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredProjects(projects);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredProjects(
+        projects.filter(
+          (project) =>
+            project.name.toLowerCase().includes(query) ||
+            project.repo.toLowerCase().includes(query) ||
+            (project.domain && project.domain.toLowerCase().includes(query))
+        )
+      );
+    }
+  }, [searchQuery, projects]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

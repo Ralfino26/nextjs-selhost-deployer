@@ -751,18 +751,15 @@ export default function ProjectDetailPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <Link 
-          href="/" 
-          className="text-sm text-gray-800 hover:text-gray-900"
+        <button
           onClick={() => {
-            // Force a refresh when navigating back to homepage
-            setTimeout(() => {
-              router.refresh();
-            }, 100);
+            // Force a hard navigation to ensure state is reset
+            window.location.href = "/";
           }}
+          className="text-sm text-gray-800 hover:text-gray-900"
         >
           ← Back to Projects
-        </Link>
+        </button>
       </div>
 
       {/* Project Header */}
