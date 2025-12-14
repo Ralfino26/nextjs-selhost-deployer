@@ -39,15 +39,21 @@ async function getDatabaseConfig(projectName: string): Promise<{
     const databaseName = dbNameMatch ? dbNameMatch[1] : projectName;
     console.log(`[BACKUP] [getDatabaseConfig] Extracted database name: ${databaseName} (match: ${dbNameMatch ? "found" : "not found, using project name"})`);
     
-    // Extract username
+    // Extract username (required - must be in docker-compose.yml)
     const usernameMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_USERNAME:\s*(\w+)/);
-    const username = usernameMatch ? usernameMatch[1] : config.database.user;
-    console.log(`[BACKUP] [getDatabaseConfig] Extracted username: ${username} (match: ${usernameMatch ? "found" : "not found, using config default"})`);
+    if (!usernameMatch) {
+      throw new Error(`Could not extract MongoDB username from docker-compose.yml for project ${projectName}`);
+    }
+    const username = usernameMatch[1];
+    console.log(`[BACKUP] [getDatabaseConfig] Extracted username: ${username}`);
     
-    // Extract password
+    // Extract password (required - must be in docker-compose.yml)
     const passwordMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_PASSWORD:\s*([^\s]+)/);
-    const password = passwordMatch ? passwordMatch[1] : config.database.password;
-    console.log(`[BACKUP] [getDatabaseConfig] Extracted password: ${password ? "***" : "NOT SET"} (match: ${passwordMatch ? "found" : "not found, using config default"})`);
+    if (!passwordMatch) {
+      throw new Error(`Could not extract MongoDB password from docker-compose.yml for project ${projectName}`);
+    }
+    const password = passwordMatch[1];
+    console.log(`[BACKUP] [getDatabaseConfig] Extracted password: ***`);
     
     if (!username || !password) {
       console.error(`[BACKUP] [getDatabaseConfig] ✗ Missing credentials - Username: ${username ? "set" : "missing"}, Password: ${password ? "set" : "missing"}`);

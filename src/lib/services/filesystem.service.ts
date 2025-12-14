@@ -3,6 +3,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { randomBytes } from "crypto";
 import { config } from "../config";
 
 const execAsync = promisify(exec);
@@ -560,10 +561,49 @@ networks:
   console.log(`[DOCKER-COMPOSE] Generated SSR docker-compose.yml (Node.js on port 3000)`);
 }
 
+/**
+ * Generate a secure random password
+ */
+function generateSecurePassword(length: number = 32): string {
+  // Use crypto.randomBytes for secure random generation
+  // Generate base64 string and remove special characters that might cause issues
+  const bytes = randomBytes(length);
+  return bytes
+    .toString("base64")
+    .replace(/[+/=]/g, "") // Remove characters that might cause issues in env vars
+    .substring(0, length);
+}
+
+/**
+ * Generate a logical database username based on project name
+ */
+function generateDatabaseUsername(projectName: string): string {
+  // Use project name, sanitize it, and add a prefix
+  const sanitized = projectName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_") // Replace non-alphanumeric with underscore
+    .substring(0, 20); // Limit length
+  
+  return `db_${sanitized}`;
+}
+
+/**
+ * Generate a logical database name based on project name
+ */
+function generateDatabaseName(projectName: string): string {
+  // Use project name, sanitize it
+  const sanitized = projectName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_") // Replace non-alphanumeric with underscore
+    .substring(0, 30); // Limit length
+  
+  return `${sanitized}_db`;
+}
+
 export async function writeDatabaseCompose(
   projectDir: string,
   projectName: string,
-  dbName: string
+  dbName?: string
 ): Promise<void> {
   const databaseDir = join(projectDir, "database");
   await mkdir(databaseDir, { recursive: true });
@@ -572,9 +612,19 @@ export async function writeDatabaseCompose(
   const { getNextAvailableDatabasePort } = await import("./port.service");
   const databasePort = await getNextAvailableDatabasePort();
 
+  // Generate secure credentials per database
+  const databaseUsername = generateDatabaseUsername(projectName);
+  const databasePassword = generateSecurePassword(32);
+  const databaseName = dbName || generateDatabaseName(projectName);
+
+  console.log(`[DATABASE] Generating credentials for ${projectName}:`);
+  console.log(`[DATABASE]   Username: ${databaseUsername}`);
+  console.log(`[DATABASE]   Database: ${databaseName}`);
+  console.log(`[DATABASE]   Password: *** (32 chars)`);
+
   const dockerComposePath = join(databaseDir, "docker-compose.yml");
   
-  // MongoDB compose as per your workflow
+  // MongoDB compose with generated credentials
   const dockerComposeContent = `version: '3.9'
 services:
   ${projectName}-mongo:
@@ -583,9 +633,9 @@ services:
     restart: unless-stopped
     command: ["mongod", "--bind_ip_all"]
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${config.database.user}
-      MONGO_INITDB_ROOT_PASSWORD: ${config.database.password}
-      MONGO_INITDB_DATABASE: ${dbName}
+      MONGO_INITDB_ROOT_USERNAME: ${databaseUsername}
+      MONGO_INITDB_ROOT_PASSWORD: ${databasePassword}
+      MONGO_INITDB_DATABASE: ${databaseName}
     ports:
       - "${databasePort}:27017"
     volumes:
@@ -593,6 +643,7 @@ services:
 `;
 
   await writeFile(dockerComposePath, dockerComposeContent);
+  console.log(`[DATABASE] ✓ Database compose file created with secure credentials`);
 }
 
 export async function projectDirectoryExists(projectName: string): Promise<boolean> {

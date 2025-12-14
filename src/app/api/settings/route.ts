@@ -6,9 +6,6 @@ import { clearConfigCache } from "@/lib/config";
 
 const configSchema = z.object({
   githubToken: z.string(),
-  mongoUser: z.string(),
-  mongoPassword: z.string(),
-  mongoDefaultDatabase: z.string(),
   projectsBaseDir: z.string(),
   backupBaseDir: z.string(),
   startingPort: z.number(),
@@ -66,11 +63,6 @@ export async function POST(request: NextRequest) {
     
     // Update non-sensitive fields normally
     if (body.githubToken !== undefined) mergedConfig.githubToken = body.githubToken;
-    if (body.mongoUser !== undefined) mergedConfig.mongoUser = body.mongoUser;
-    if (body.mongoPassword !== undefined && body.mongoPassword !== "") {
-      mergedConfig.mongoPassword = body.mongoPassword;
-    }
-    if (body.mongoDefaultDatabase !== undefined) mergedConfig.mongoDefaultDatabase = body.mongoDefaultDatabase;
     if (body.projectsBaseDir !== undefined) mergedConfig.projectsBaseDir = body.projectsBaseDir;
     if (body.backupBaseDir !== undefined) mergedConfig.backupBaseDir = body.backupBaseDir;
     if (body.startingPort !== undefined) mergedConfig.startingPort = body.startingPort;
@@ -100,7 +92,6 @@ export async function POST(request: NextRequest) {
     console.log("[SETTINGS] Config values (sensitive fields masked):", {
       ...configToSave,
       githubToken: configToSave.githubToken ? "***" : "",
-      mongoPassword: configToSave.mongoPassword ? "***" : "",
       npmPassword: configToSave.npmPassword ? "***" : "",
     });
     

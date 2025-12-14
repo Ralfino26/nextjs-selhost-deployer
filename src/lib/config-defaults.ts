@@ -6,9 +6,6 @@
 
 export interface DefaultConfigData {
   githubToken: string;
-  mongoUser: string;
-  mongoPassword: string;
-  mongoDefaultDatabase: string;
   projectsBaseDir: string;
   backupBaseDir: string;
   startingPort: number;
@@ -26,9 +23,6 @@ export interface DefaultConfigData {
 export function getDefaultConfig(): DefaultConfigData {
   return {
     githubToken: "",
-    mongoUser: "ralf",
-    mongoPassword: "supersecret",
-    mongoDefaultDatabase: "admin",
     projectsBaseDir: "/srv/vps/websites",
     backupBaseDir: "/srv/vps/backups",
     startingPort: 5000,

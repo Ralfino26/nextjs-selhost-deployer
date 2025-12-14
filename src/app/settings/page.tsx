@@ -15,9 +15,6 @@ import {
 
 interface Config {
   githubToken: string;
-  mongoUser: string;
-  mongoPassword: string;
-  mongoDefaultDatabase: string;
   projectsBaseDir: string;
   backupBaseDir: string;
   startingPort: number;
@@ -32,9 +29,6 @@ export default function SettingsPage() {
   // Initialize empty - will be loaded from config.json
   const [config, setConfig] = useState<Config>({
     githubToken: "",
-    mongoUser: "",
-    mongoPassword: "",
-    mongoDefaultDatabase: "",
     projectsBaseDir: "",
     backupBaseDir: "",
     startingPort: 0,
@@ -89,9 +83,6 @@ export default function SettingsPage() {
       // Use exactly what's in the form - no defaults, no fallbacks
       const configToSave: Config = {
         githubToken: latestConfig.githubToken || "",
-        mongoUser: latestConfig.mongoUser || "",
-        mongoPassword: latestConfig.mongoPassword || "",
-        mongoDefaultDatabase: latestConfig.mongoDefaultDatabase || "",
         projectsBaseDir: latestConfig.projectsBaseDir || "",
         backupBaseDir: latestConfig.backupBaseDir || "",
         startingPort: latestConfig.startingPort || 0,
@@ -161,45 +152,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-6">
-          <h2 className="mb-4 text-lg font-medium">MongoDB Configuration</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="mongoUser">MongoDB User</Label>
-              <Input
-                id="mongoUser"
-                value={config.mongoUser}
-                onChange={(e) =>
-                  setConfig({ ...config, mongoUser: e.target.value })
-                }
-                placeholder="e.g. ralf"
-              />
-            </div>
-            <div>
-              <Label htmlFor="mongoPassword">MongoDB Password</Label>
-              <Input
-                id="mongoPassword"
-                type="password"
-                value={config.mongoPassword}
-                onChange={(e) =>
-                  setConfig({ ...config, mongoPassword: e.target.value })
-                }
-                placeholder="MongoDB password"
-              />
-            </div>
-            <div>
-              <Label htmlFor="mongoDefaultDatabase">Default Database</Label>
-              <Input
-                id="mongoDefaultDatabase"
-                value={config.mongoDefaultDatabase}
-                onChange={(e) =>
-                  setConfig({ ...config, mongoDefaultDatabase: e.target.value })
-                }
-                placeholder="e.g. admin"
-              />
-            </div>
-          </div>
-        </div>
 
         <div className="border-t border-gray-200 pt-6">
           <h2 className="mb-4 text-lg font-medium">Nginx Proxy Manager Configuration</h2>

@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
           sendLog("🗄️  Setting up database...\n");
           
           const { writeDatabaseCompose } = await import("@/lib/services/filesystem.service");
-          // Use project name as database name
-          await writeDatabaseCompose(projectDir, data.projectName, data.projectName);
+          // Generate unique credentials per database
+          await writeDatabaseCompose(projectDir, data.projectName);
           
           sendLog("✅ Database compose file created\n");
           sendLog("🚀 Starting database container...\n");

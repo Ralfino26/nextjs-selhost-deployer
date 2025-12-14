@@ -236,8 +236,11 @@ export async function GET(
           const databaseVolumePath = join(projectDir, "database", "data");
           
           // Get credentials from docker-compose.yml, fallback to config
-          const dbUser = usernameMatch ? usernameMatch[1] : config.database.user;
-          const dbPassword = passwordMatch ? passwordMatch[1] : config.database.password;
+          if (!usernameMatch || !passwordMatch) {
+            throw new Error(`Could not extract MongoDB credentials from docker-compose.yml for project ${projectName}`);
+          }
+          const dbUser = usernameMatch[1];
+          const dbPassword = passwordMatch[1];
           
           // Get database container information
           const dbContainerName = `${projectName}-mongo`;

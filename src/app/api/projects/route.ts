@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
     // Write database compose if needed
     if (data.createDatabase) {
       const { writeDatabaseCompose } = await import("@/lib/services/filesystem.service");
-      // Use project name as database name
-      await writeDatabaseCompose(projectDir, data.projectName, data.projectName);
+      // Generate unique credentials per database
+      await writeDatabaseCompose(projectDir, data.projectName);
       await startDatabase(data.projectName);
     }
 

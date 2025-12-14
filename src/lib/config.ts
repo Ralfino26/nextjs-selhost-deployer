@@ -77,18 +77,6 @@ export const config = {
     return loadConfig().githubToken;
   },
   
-  get database(): {
-    user: string;
-    password: string;
-    defaultDatabase: string;
-  } {
-    const c = loadConfig();
-    return {
-      user: c.mongoUser,
-      password: c.mongoPassword,
-      defaultDatabase: c.mongoDefaultDatabase,
-    };
-  },
   
   get npmUrl(): string {
     return loadConfig().npmUrl || process.env.NPM_URL || "http://nginx-proxy-manager:81";
