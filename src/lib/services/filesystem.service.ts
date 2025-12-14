@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, access } from "fs/promises";
+import { mkdir, writeFile, readFile, access, readdir, stat } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import { exec } from "child_process";
@@ -156,42 +156,218 @@ export async function detectStaticExport(repoPath: string): Promise<boolean> {
     return true;
   }
 
-  // Check if app directory exists and has no server components
-  // Next.js 13+ with app router can generate static sites without output: 'export'
-  // if all pages are static (no server components, no API routes)
-  const appDir = join(repoPath, "app");
-  const pagesDir = join(repoPath, "pages");
-  const hasAppDir = existsSync(appDir);
-  const hasPagesDir = existsSync(pagesDir);
-  
-  // Check for API routes - if no API routes exist, it might be SSG
-  if (hasAppDir) {
-    const apiRoute = join(appDir, "api");
-    if (!existsSync(apiRoute)) {
-      // No API routes, check if there are any server components
-      // For now, if there's no output: 'export' but also no API routes,
-      // we'll assume it's SSG if the user wants static export
-      // But we need to be more careful here - let's check package.json for hints
-      try {
-        const packageJsonPath = join(repoPath, "package.json");
-        if (existsSync(packageJsonPath)) {
-          const packageJsonContent = await readFile(packageJsonPath, "utf-8");
-          const packageJson = JSON.parse(packageJsonContent);
-          
-          // If build script doesn't include 'start', it might be SSG
-          // (SSG sites don't need a start script)
-          if (!packageJson.scripts?.start && !packageJson.scripts?.start?.includes("next start")) {
-            console.log(`[SSG DETECT] No start script found, might be SSG`);
-            // Don't return true here, just log - we need output: 'export' to be sure
-          }
-        }
-      } catch (error) {
-        // Ignore
-      }
-    }
+  // If no explicit output: 'export', check if the project is fully static
+  // by analyzing the code structure
+  const isFullyStatic = await detectFullyStaticProject(repoPath);
+  if (isFullyStatic) {
+    console.log(`[SSG DETECT] Project appears to be fully static (no API routes, no server components)`);
+    return true;
   }
 
   return false;
+}
+
+/**
+ * Detect if a Next.js project is fully static by checking for:
+ * - API routes (app/api or pages/api)
+ * - Server components (use server, async page components)
+ * - Dynamic rendering requirements
+ */
+async function detectFullyStaticProject(repoPath: string): Promise<boolean> {
+  try {
+    const appDir = join(repoPath, "app");
+    const pagesDir = join(repoPath, "pages");
+    const hasAppDir = existsSync(appDir);
+    const hasPagesDir = existsSync(pagesDir);
+
+    // Check for API routes - if API routes exist, it's not fully static
+    if (hasAppDir) {
+      const apiRoute = join(appDir, "api");
+      if (existsSync(apiRoute)) {
+        console.log(`[SSG DETECT] Found API routes in app/api - not fully static`);
+        return false;
+      }
+    }
+
+    if (hasPagesDir) {
+      const apiRoute = join(pagesDir, "api");
+      if (existsSync(apiRoute)) {
+        console.log(`[SSG DETECT] Found API routes in pages/api - not fully static`);
+        return false;
+      }
+    }
+
+    // Check for middleware that might do server-side logic
+    const middlewareFiles = [
+      join(repoPath, "middleware.ts"),
+      join(repoPath, "middleware.js"),
+    ];
+    for (const middlewareFile of middlewareFiles) {
+      if (existsSync(middlewareFile)) {
+        try {
+          const content = await readFile(middlewareFile, "utf-8");
+          // If middleware has complex logic (not just simple redirects), it might need SSR
+          // For now, we'll be conservative - if middleware exists, assume SSR
+          // But check if it's just a simple redirect middleware
+          const hasComplexLogic = 
+            content.includes("cookies") ||
+            content.includes("headers") ||
+            content.includes("request") ||
+            content.includes("response") ||
+            content.includes("rewrite") ||
+            content.includes("nextUrl");
+          
+          if (hasComplexLogic) {
+            console.log(`[SSG DETECT] Found middleware with server-side logic - not fully static`);
+            return false;
+          }
+        } catch (error) {
+          // Ignore read errors
+        }
+      }
+    }
+
+    // Check for server components in app directory
+    if (hasAppDir) {
+      const hasServerComponents = await checkForServerComponents(appDir);
+      if (hasServerComponents) {
+        console.log(`[SSG DETECT] Found server components - not fully static`);
+        return false;
+      }
+    }
+
+    // Check pages directory for server-side rendering
+    if (hasPagesDir) {
+      const hasSSR = await checkPagesForSSR(pagesDir);
+      if (hasSSR) {
+        console.log(`[SSG DETECT] Found SSR in pages directory - not fully static`);
+        return false;
+      }
+    }
+
+    // If we get here, the project appears to be fully static
+    return true;
+  } catch (error) {
+    console.warn(`[SSG DETECT] Error checking if project is fully static:`, error);
+    // On error, assume SSR to be safe
+    return false;
+  }
+}
+
+/**
+ * Recursively check for server components in app directory
+ */
+async function checkForServerComponents(dir: string): Promise<boolean> {
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      
+      // Skip node_modules and .next
+      if (entry.name === "node_modules" || entry.name === ".next" || entry.name === "out") {
+        continue;
+      }
+      
+      if (entry.isDirectory()) {
+        const hasServerComponents = await checkForServerComponents(fullPath);
+        if (hasServerComponents) {
+          return true;
+        }
+      } else if (entry.isFile()) {
+        // Check for server component indicators
+        const ext = entry.name.split(".").pop()?.toLowerCase();
+        if (ext === "ts" || ext === "tsx" || ext === "js" || ext === "jsx") {
+          try {
+            const content = await readFile(fullPath, "utf-8");
+            
+            // Check for "use server" directive
+            if (content.includes("'use server'") || content.includes('"use server"')) {
+              console.log(`[SSG DETECT] Found 'use server' in ${fullPath}`);
+              return true;
+            }
+            
+            // Check for async page components that might do server-side data fetching
+            // This is a heuristic - async components in app router are server components
+            if (entry.name === "page.tsx" || entry.name === "page.ts" || 
+                entry.name === "page.jsx" || entry.name === "page.js") {
+              // Check if it's an async function component
+              if (content.includes("async") && (content.includes("export default") || content.includes("export async"))) {
+                // But check if it uses client-side only APIs
+                const hasClientOnly = 
+                  content.includes("use client") ||
+                  content.includes("useState") ||
+                  content.includes("useEffect") ||
+                  content.includes("window") ||
+                  content.includes("document");
+                
+                if (!hasClientOnly) {
+                  // It's likely a server component doing data fetching
+                  console.log(`[SSG DETECT] Found async server component in ${fullPath}`);
+                  return true;
+                }
+              }
+            }
+            
+            // Check for server actions
+            if (content.includes("server action") || content.match(/action\s*[:=]\s*async/)) {
+              console.log(`[SSG DETECT] Found server action in ${fullPath}`);
+              return true;
+            }
+          } catch (error) {
+            // Ignore read errors
+          }
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Check pages directory for SSR indicators
+ */
+async function checkPagesForSSR(pagesDir: string): Promise<boolean> {
+  try {
+    const entries = await readdir(pagesDir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const hasSSR = await checkPagesForSSR(join(pagesDir, entry.name));
+        if (hasSSR) {
+          return true;
+        }
+      } else if (entry.isFile()) {
+        const ext = entry.name.split(".").pop()?.toLowerCase();
+        if (ext === "ts" || ext === "tsx" || ext === "js" || ext === "jsx") {
+          try {
+            const content = await readFile(join(pagesDir, entry.name), "utf-8");
+            
+            // Check for getServerSideProps (SSR)
+            if (content.includes("getServerSideProps")) {
+              console.log(`[SSG DETECT] Found getServerSideProps in ${entry.name}`);
+              return true;
+            }
+            
+            // Check for getInitialProps (SSR)
+            if (content.includes("getInitialProps")) {
+              console.log(`[SSG DETECT] Found getInitialProps in ${entry.name}`);
+              return true;
+            }
+          } catch (error) {
+            // Ignore read errors
+          }
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    return false;
+  }
 }
 
 export async function writeDockerfile(
