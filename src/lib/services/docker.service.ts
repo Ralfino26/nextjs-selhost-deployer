@@ -194,55 +194,33 @@ export async function stopProject(projectName: string): Promise<void> {
   });
 }
 
-// Delete a project completely - removes all Docker resources and files
+// Delete a project - removes ONLY Docker resources for this specific project
+// NEVER touches other projects or Docker resources
 export async function deleteProject(projectName: string): Promise<void> {
-  const projectDir = join(config.projectsBaseDir, projectName);
-  const dockerComposeDir = join(projectDir, "docker");
-  const databaseDir = join(projectDir, "database");
+  console.log(`[DELETE] Starting cleanup for project: ${projectName} ONLY`);
 
-  console.log(`[DELETE] Starting complete cleanup for project: ${projectName}`);
-
-  // Step 1: Stop and remove main service containers and volumes
-  try {
-    console.log(`[DELETE] Stopping and removing main service containers...`);
-    await execAsync(`docker compose down -v --remove-orphans`, {
-      cwd: dockerComposeDir,
-    });
-    console.log(`[DELETE] ✓ Main service containers removed`);
-  } catch (error) {
-    console.warn(`[DELETE] Warning: Failed to remove main service (might not exist):`, error);
-  }
-
-  // Step 2: Stop and remove database containers and volumes
-  try {
-    console.log(`[DELETE] Stopping and removing database containers...`);
-    await execAsync(`docker compose down -v --remove-orphans`, {
-      cwd: databaseDir,
-    });
-    console.log(`[DELETE] ✓ Database containers removed`);
-  } catch (error) {
-    // Database might not exist, ignore
-    console.log(`[DELETE] No database to remove (this is OK)`);
-  }
-
-  // Step 3: Remove containers by name (in case compose didn't catch them)
+  // ONLY remove containers with EXACT names matching this project
   const mainContainerName = projectName;
   const dbContainerName = `${projectName}-mongo`;
   
   try {
     const docker = await getDocker();
     
-    // Remove main container if it exists
+    // Remove main container ONLY if it exists and name matches exactly
     try {
       const mainContainer = docker.getContainer(mainContainerName);
       const mainInfo = await mainContainer.inspect();
-      if (mainInfo) {
+      
+      // Double-check: container name must match exactly
+      if (mainInfo.Name === `/${mainContainerName}` || mainInfo.Name === mainContainerName) {
         console.log(`[DELETE] Removing container: ${mainContainerName}`);
         if (mainInfo.State.Running) {
           await mainContainer.stop();
         }
         await mainContainer.remove({ force: true, v: true });
         console.log(`[DELETE] ✓ Container ${mainContainerName} removed`);
+      } else {
+        console.warn(`[DELETE] Container name mismatch, skipping: ${mainInfo.Name} != ${mainContainerName}`);
       }
     } catch (error: any) {
       if (error.statusCode !== 404) {
@@ -250,17 +228,21 @@ export async function deleteProject(projectName: string): Promise<void> {
       }
     }
 
-    // Remove database container if it exists
+    // Remove database container ONLY if it exists and name matches exactly
     try {
       const dbContainer = docker.getContainer(dbContainerName);
       const dbInfo = await dbContainer.inspect();
-      if (dbInfo) {
+      
+      // Double-check: container name must match exactly
+      if (dbInfo.Name === `/${dbContainerName}` || dbInfo.Name === dbContainerName) {
         console.log(`[DELETE] Removing container: ${dbContainerName}`);
         if (dbInfo.State.Running) {
           await dbContainer.stop();
         }
         await dbContainer.remove({ force: true, v: true });
         console.log(`[DELETE] ✓ Container ${dbContainerName} removed`);
+      } else {
+        console.warn(`[DELETE] Container name mismatch, skipping: ${dbInfo.Name} != ${dbContainerName}`);
       }
     } catch (error: any) {
       if (error.statusCode !== 404) {
@@ -271,49 +253,31 @@ export async function deleteProject(projectName: string): Promise<void> {
     console.warn(`[DELETE] Warning: Could not access Docker API:`, error);
   }
 
-  // Step 4: Remove project-specific images
+  // ONLY remove volumes that are EXACTLY named after this project
+  // Use strict matching to avoid removing volumes from other projects
   try {
-    console.log(`[DELETE] Removing project-specific images...`);
+    console.log(`[DELETE] Checking for project-specific volumes (strict matching)...`);
     const { exec } = await import("child_process");
     const { promisify } = await import("util");
     const execAsync = promisify(exec);
 
-    // Try to remove images that match the project name pattern
-    // Docker Compose typically creates images like: {projectName} or docker-{projectName}
-    const imagePatterns = [
-      projectName,
-      `docker-${projectName}`,
-      `${projectName}:latest`,
-      `docker-${projectName}:latest`,
-    ];
-
-    for (const pattern of imagePatterns) {
-      try {
-        await execAsync(`docker rmi -f ${pattern} 2>/dev/null || true`);
-        console.log(`[DELETE] Attempted to remove image: ${pattern}`);
-      } catch (error) {
-        // Image might not exist, ignore
-      }
-    }
-    console.log(`[DELETE] ✓ Images cleanup attempted`);
-  } catch (error) {
-    console.warn(`[DELETE] Warning: Could not remove images:`, error);
-  }
-
-  // Step 5: Remove orphaned volumes (volumes that might be named after the project)
-  try {
-    console.log(`[DELETE] Checking for orphaned volumes...`);
-    const { exec } = await import("child_process");
-    const { promisify } = await import("util");
-    const execAsync = promisify(exec);
-
-    // List all volumes and filter for project-specific ones
+    // List all volumes
     const result = await execAsync(`docker volume ls -q`);
     const volumes = result.stdout.trim().split("\n").filter(Boolean);
     
-    const projectVolumes = volumes.filter((vol: string) => 
-      vol.includes(projectName) || vol.includes(`docker-${projectName}`)
-    );
+    // STRICT matching: volume name must be EXACTLY the project name or start with project name + specific patterns
+    // This prevents matching volumes from other projects that might contain the project name as a substring
+    const projectVolumes = volumes.filter((vol: string) => {
+      // Exact match
+      if (vol === projectName) return true;
+      // Match: {projectName}_* or {projectName}-*
+      if (vol.startsWith(`${projectName}_`) || vol.startsWith(`${projectName}-`)) return true;
+      // Match: docker-{projectName} or docker-{projectName}_*
+      if (vol === `docker-${projectName}` || vol.startsWith(`docker-${projectName}_`) || vol.startsWith(`docker-${projectName}-`)) return true;
+      // Match: {projectName}-mongo or {projectName}_mongo
+      if (vol === `${projectName}-mongo` || vol === `${projectName}_mongo`) return true;
+      return false;
+    });
 
     for (const volume of projectVolumes) {
       try {
@@ -325,18 +289,43 @@ export async function deleteProject(projectName: string): Promise<void> {
     }
     
     if (projectVolumes.length === 0) {
-      console.log(`[DELETE] No orphaned volumes found`);
+      console.log(`[DELETE] No project-specific volumes found`);
     }
   } catch (error) {
     console.warn(`[DELETE] Warning: Could not check volumes:`, error);
   }
 
-  // Step 6: DO NOT remove project files - only Docker resources
-  // Files remain on the VPS for manual cleanup if needed
-  console.log(`[DELETE] Project files preserved (not removed from VPS)`);
-  console.log(`[DELETE] Project directory remains: ${projectDir}`);
+  // ONLY remove images with EXACT names matching this project
+  try {
+    console.log(`[DELETE] Removing project-specific images (exact match only)...`);
+    const { exec } = await import("child_process");
+    const { promisify } = await import("util");
+    const execAsync = promisify(exec);
 
-  console.log(`[DELETE] ✓ Complete Docker cleanup finished for project: ${projectName}`);
+    // ONLY exact image names - no wildcards, no partial matches
+    const exactImageNames = [
+      `${projectName}:latest`,
+      `docker-${projectName}:latest`,
+    ];
+
+    for (const imageName of exactImageNames) {
+      try {
+        // Check if image exists first
+        await execAsync(`docker image inspect ${imageName} > /dev/null 2>&1`);
+        await execAsync(`docker rmi -f ${imageName}`);
+        console.log(`[DELETE] ✓ Removed image: ${imageName}`);
+      } catch (error) {
+        // Image doesn't exist or couldn't be removed, ignore
+        console.log(`[DELETE] Image ${imageName} not found or couldn't be removed (OK)`);
+      }
+    }
+    console.log(`[DELETE] ✓ Images cleanup completed`);
+  } catch (error) {
+    console.warn(`[DELETE] Warning: Could not remove images:`, error);
+  }
+
+  console.log(`[DELETE] ✓ Cleanup finished for project: ${projectName} ONLY`);
+  console.log(`[DELETE] Other projects and Docker resources remain untouched`);
 }
 
 // Get container logs
@@ -402,4 +391,6 @@ export async function getProjectStatus(projectName: string): Promise<"Running" |
     return "Stopped";
   }
 }
+
+
 
