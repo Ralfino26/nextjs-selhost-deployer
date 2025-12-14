@@ -59,6 +59,86 @@ export async function cloneRepository(
   return repoName;
 }
 
+/**
+ * Detect if a Next.js project is configured for static export (SSG)
+ */
+export async function detectStaticExport(repoPath: string): Promise<boolean> {
+  // Check next.config.js
+  const nextConfigJs = join(repoPath, "next.config.js");
+  // Check next.config.ts
+  const nextConfigTs = join(repoPath, "next.config.ts");
+  // Check next.config.mjs
+  const nextConfigMjs = join(repoPath, "next.config.mjs");
+  
+  const configFiles = [
+    { path: nextConfigJs, type: "js" },
+    { path: nextConfigTs, type: "ts" },
+    { path: nextConfigMjs, type: "mjs" },
+  ];
+
+  for (const configFile of configFiles) {
+    if (existsSync(configFile.path)) {
+      try {
+        const content = await readFile(configFile.path, "utf-8");
+        
+        // Check for various patterns:
+        // - output: 'export'
+        // - output: "export"
+        // - output: 'export',
+        // - output: "export",
+        // - output: 'export' in object
+        const exportPatterns = [
+          /output\s*[:=]\s*['"]export['"]/,
+          /output\s*:\s*['"]export['"]/,
+          /['"]output['"]\s*:\s*['"]export['"]/,
+        ];
+        
+        for (const pattern of exportPatterns) {
+          if (pattern.test(content)) {
+            console.log(`[SSG DETECT] Found static export in ${configFile.path}`);
+            return true;
+          }
+        }
+        
+        // Also check for output: "export" in object syntax (common in TypeScript)
+        if (content.includes("output") && (content.includes("'export'") || content.includes('"export"'))) {
+          // More specific check: look for output property with export value
+          const lines = content.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.includes("output") && (trimmed.includes("'export'") || trimmed.includes('"export"'))) {
+              console.log(`[SSG DETECT] Found static export in ${configFile.path} (line: ${trimmed})`);
+              return true;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`[SSG DETECT] Could not read ${configFile.path}:`, error);
+      }
+    }
+  }
+
+  // Also check package.json for build script that might indicate static export
+  try {
+    const packageJsonPath = join(repoPath, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const packageJsonContent = await readFile(packageJsonPath, "utf-8");
+      const packageJson = JSON.parse(packageJsonContent);
+      
+      // Check if build script includes 'export'
+      if (packageJson.scripts?.build?.includes("export") || 
+          packageJson.scripts?.build?.includes("next export")) {
+        console.log(`[SSG DETECT] Found export in build script`);
+        return true;
+      }
+    }
+  } catch (error) {
+    // Ignore errors
+  }
+
+  return false;
+}
+
 export async function writeDockerfile(
   projectDir: string,
   repoName: string,
@@ -77,6 +157,16 @@ export async function writeDockerfile(
   }
 
   const repoPath = join(projectDir, repoName);
+  
+  // Detect if this is a static export (SSG) project
+  const isStaticExport = await detectStaticExport(repoPath);
+  console.log(`[DOCKERFILE] Static export detected: ${isStaticExport}`);
+  
+  if (isStaticExport) {
+    // Generate SSG Dockerfile (nginx-based)
+    await writeStaticDockerfile(repoPath, dockerfilePath);
+    return;
+  }
   
   // Detect package manager and lock files
   const bunLockExists = existsSync(join(repoPath, "bun.lock"));
@@ -206,6 +296,194 @@ CMD ${JSON.stringify(startCommand)}
   console.log(`[DOCKERFILE] ✓ Dockerfile written to ${dockerfilePath}`);
 }
 
+/**
+ * Generate Dockerfile for static export (SSG) sites using nginx
+ */
+async function writeStaticDockerfile(
+  repoPath: string,
+  dockerfilePath: string
+): Promise<void> {
+  // Detect package manager and lock files
+  const bunLockExists = existsSync(join(repoPath, "bun.lock"));
+  const packageLockExists = existsSync(join(repoPath, "package-lock.json"));
+  const yarnLockExists = existsSync(join(repoPath, "yarn.lock"));
+  const pnpmLockExists = existsSync(join(repoPath, "pnpm-lock.yaml"));
+  
+  console.log(`[DOCKERFILE] Generating SSG Dockerfile:`);
+  console.log(`[DOCKERFILE]   bun.lock: ${bunLockExists}`);
+  console.log(`[DOCKERFILE]   package-lock.json: ${packageLockExists}`);
+  console.log(`[DOCKERFILE]   yarn.lock: ${yarnLockExists}`);
+  console.log(`[DOCKERFILE]   pnpm-lock.yaml: ${pnpmLockExists}`);
+  
+  // Default to bun
+  let packageManager = "bun";
+  let baseImage = "oven/bun:1";
+  let installCommand = "bun install";
+  let buildCommand = "bun next build";
+  let copyLockFiles = "COPY package.json ./";
+  
+  // Read package.json to detect package manager
+  try {
+    const packageJsonPath = join(repoPath, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const packageJsonContent = await readFile(packageJsonPath, "utf-8");
+      const packageJson = JSON.parse(packageJsonContent);
+      
+      // Check for packageManager field
+      if (packageJson.packageManager) {
+        const pm = packageJson.packageManager.toLowerCase();
+        if (pm.includes("bun")) {
+          packageManager = "bun";
+        } else if (pm.includes("yarn")) {
+          packageManager = "yarn";
+        } else if (pm.includes("pnpm")) {
+          packageManager = "pnpm";
+        } else {
+          packageManager = "npm";
+        }
+      } else {
+        // Detect from lock files
+        if (bunLockExists) {
+          packageManager = "bun";
+        } else if (yarnLockExists) {
+          packageManager = "yarn";
+        } else if (pnpmLockExists) {
+          packageManager = "pnpm";
+        } else if (packageLockExists) {
+          packageManager = "npm";
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Could not read package.json, using bun as default:`, error);
+  }
+  
+  // Configure based on detected package manager
+  switch (packageManager) {
+    case "yarn":
+      baseImage = "node:20-alpine";
+      installCommand = yarnLockExists ? "yarn install --frozen-lockfile" : "yarn install";
+      buildCommand = "yarn next build";
+      copyLockFiles = yarnLockExists 
+        ? "COPY package.json yarn.lock ./"
+        : "COPY package.json ./";
+      break;
+    case "pnpm":
+      baseImage = "node:20-alpine";
+      installCommand = pnpmLockExists ? "pnpm install --frozen-lockfile" : "pnpm install";
+      buildCommand = "pnpm next build";
+      copyLockFiles = pnpmLockExists
+        ? "COPY package.json pnpm-lock.yaml ./"
+        : "COPY package.json ./";
+      break;
+    case "npm":
+      baseImage = "node:20-alpine";
+      installCommand = packageLockExists ? "npm ci" : "npm install";
+      buildCommand = "npm run build";
+      copyLockFiles = packageLockExists
+        ? "COPY package.json package-lock.json ./"
+        : "COPY package.json ./";
+      break;
+    case "bun":
+    default:
+      baseImage = "oven/bun:1";
+      installCommand = "bun install";
+      buildCommand = "bun next build";
+      copyLockFiles = bunLockExists
+        ? "COPY package.json bun.lock ./"
+        : "COPY package.json ./";
+      break;
+  }
+  
+  // Install package manager if needed (for non-bun)
+  let installPmStep = "";
+  if (packageManager === "yarn") {
+    installPmStep = "RUN apk add --no-cache yarn\n";
+  } else if (packageManager === "pnpm") {
+    installPmStep = "RUN npm install -g pnpm\n";
+  }
+  
+  // Multi-stage build: build stage + nginx stage
+  const dockerfileContent = `# Build stage
+FROM ${baseImage} AS builder
+WORKDIR /app
+${installPmStep}${copyLockFiles}
+RUN ${installCommand}
+COPY . .
+ENV NODE_ENV=production
+RUN ${buildCommand}
+
+# Production stage with nginx
+FROM nginx:alpine
+WORKDIR /usr/share/nginx/html
+
+# Copy static files from build
+# Next.js static export outputs to 'out' directory by default
+COPY --from=builder /app/out /usr/share/nginx/html
+
+# Copy public folder if it exists (for assets)
+COPY --from=builder /app/public /usr/share/nginx/html/public 2>/dev/null || true
+
+# Nginx configuration for SPA routing
+RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json application/javascript;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Static assets caching
+    location /_next/static {
+        alias /usr/share/nginx/html/_next/static;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Public assets
+    location /public {
+        alias /usr/share/nginx/html/public;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # SPA routing - try files, fallback to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "healthy\\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`;
+
+  console.log(`[DOCKERFILE] Generated SSG Dockerfile:`);
+  console.log(`[DOCKERFILE]   Package manager: ${packageManager}`);
+  console.log(`[DOCKERFILE]   Base image: ${baseImage}`);
+  console.log(`[DOCKERFILE]   Build command: ${buildCommand}`);
+
+  await writeFile(dockerfilePath, dockerfileContent);
+  console.log(`[DOCKERFILE] ✓ SSG Dockerfile written to ${dockerfilePath}`);
+}
+
 export async function writeDockerCompose(
   projectDir: string,
   projectName: string,
@@ -218,13 +496,44 @@ export async function writeDockerCompose(
 
   const dockerComposePath = join(dockerDir, "docker-compose.yml");
   
-  // Build environment section
+  // Check if this is a static export project
+  const repoPath = join(projectDir, repoName);
+  const isStaticExport = await detectStaticExport(repoPath);
+  
+  if (isStaticExport) {
+    // SSG sites use nginx on port 80, no environment variables needed
+    const dockerComposeContent = `services:
+  ${projectName}:
+    container_name: ${projectName}
+    build:
+      context: ../${repoName}
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${port}:80"
+    networks:
+      - websites_network
+      - infra_network
+
+networks:
+  websites_network:
+    name: websites_network
+  infra_network:
+    external: true
+`;
+
+    await writeFile(dockerComposePath, dockerComposeContent);
+    console.log(`[DOCKER-COMPOSE] Generated SSG docker-compose.yml (nginx on port 80)`);
+    return;
+  }
+  
+  // Build environment section for SSR sites
   const envSection = [
     "NODE_ENV: production",
     ...envVars.map((v) => `${v.key}: ${v.value}`),
   ].join("\n      ");
   
-  // Exact structure from your workflow
+  // Exact structure from your workflow (SSR)
   const dockerComposeContent = `services:
   ${projectName}:
     container_name: ${projectName}
@@ -248,6 +557,7 @@ networks:
 `;
 
   await writeFile(dockerComposePath, dockerComposeContent);
+  console.log(`[DOCKER-COMPOSE] Generated SSR docker-compose.yml (Node.js on port 3000)`);
 }
 
 export async function writeDatabaseCompose(
