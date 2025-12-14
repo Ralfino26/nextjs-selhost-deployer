@@ -3,6 +3,7 @@ import { readFile, writeFile, rename, unlink } from "fs/promises";
 import { join } from "path";
 import { z } from "zod";
 import { clearConfigCache } from "@/lib/config";
+import { getDefaultConfig } from "@/lib/config-defaults";
 
 const configSchema = z.object({
   githubToken: z.string(),
@@ -26,31 +27,32 @@ export async function GET() {
   try {
     try {
       const content = await readFile(CONFIG_FILE, "utf-8");
-      const config = JSON.parse(content);
+      const parsed = JSON.parse(content);
+      
+      // Merge with defaults to ensure all fields are present
+      // This handles cases where the config file is missing fields or is corrupt
+      const defaults = getDefaultConfig();
+      const config = {
+        ...defaults,
+        ...parsed,
+        // Ensure optional fields are preserved
+        npmUrl: parsed.npmUrl ?? defaults.npmUrl,
+        npmEmail: parsed.npmEmail ?? defaults.npmEmail,
+        npmPassword: parsed.npmPassword ?? defaults.npmPassword,
+      };
+      
       return NextResponse.json(config);
-    } catch {
-      // Config file doesn't exist, return defaults
-      return NextResponse.json({
-        githubToken: "",
-        mongoUser: "ralf",
-        mongoPassword: "supersecret",
-        mongoDefaultDatabase: "admin",
-        projectsBaseDir: "/srv/vps/websites",
-        backupBaseDir: "/srv/vps/backups",
-        startingPort: 5000,
-        websitesNetwork: "websites_network",
-        infraNetwork: "infra_network",
-        npmUrl: process.env.NPM_URL || "http://nginx-proxy-manager:81",
-        npmEmail: process.env.NPM_EMAIL || "",
-        npmPassword: process.env.NPM_PASSWORD || "",
-      });
+    } catch (error) {
+      // Config file doesn't exist or is corrupt, return defaults
+      console.warn("[SETTINGS] Config file missing or corrupt, returning defaults:", error);
+      const defaults = getDefaultConfig();
+      return NextResponse.json(defaults);
     }
   } catch (error) {
-    console.error("Error fetching settings:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch settings" },
-      { status: 500 }
-    );
+    console.error("[SETTINGS] Error fetching settings:", error);
+    // Even if something goes wrong, return defaults so the app keeps working
+    const defaults = getDefaultConfig();
+    return NextResponse.json(defaults);
   }
 }
 
@@ -60,28 +62,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Load existing config first to preserve values that aren't being updated
-    let existingConfig: any = {};
+    const defaults = getDefaultConfig();
+    let existingConfig: any = { ...defaults };
     try {
       const content = await readFile(CONFIG_FILE, "utf-8");
-      existingConfig = JSON.parse(content);
-      console.log("[SETTINGS] Loaded existing config");
-    } catch {
-      // Config file doesn't exist, use defaults
+      const parsed = JSON.parse(content);
+      // Merge with defaults to ensure all fields are present
       existingConfig = {
-        githubToken: "",
-        mongoUser: "ralf",
-        mongoPassword: "supersecret",
-        mongoDefaultDatabase: "admin",
-        projectsBaseDir: "/srv/vps/websites",
-        backupBaseDir: "/srv/vps/backups",
-        startingPort: 5000,
-        websitesNetwork: "websites_network",
-        infraNetwork: "infra_network",
-        npmUrl: process.env.NPM_URL || "http://nginx-proxy-manager:81",
-        npmEmail: process.env.NPM_EMAIL || "",
-        npmPassword: process.env.NPM_PASSWORD || "",
+        ...defaults,
+        ...parsed,
+        npmUrl: parsed.npmUrl ?? defaults.npmUrl,
+        npmEmail: parsed.npmEmail ?? defaults.npmEmail,
+        npmPassword: parsed.npmPassword ?? defaults.npmPassword,
       };
-      console.log("[SETTINGS] Using defaults (no existing config)");
+      console.log("[SETTINGS] Loaded existing config");
+    } catch (error) {
+      // Config file doesn't exist or is corrupt, use defaults
+      console.warn("[SETTINGS] Config file missing or corrupt, using defaults:", error);
+      existingConfig = defaults;
     }
 
     // Merge: only update fields that are provided in the request body

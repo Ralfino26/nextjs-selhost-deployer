@@ -1,23 +1,11 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { existsSync } from "fs";
+import { getDefaultConfig, type DefaultConfigData } from "./config-defaults";
 
 const CONFIG_FILE = join(process.cwd(), "data", "config.json");
 
-interface ConfigData {
-  githubToken: string;
-  mongoUser: string;
-  mongoPassword: string;
-  mongoDefaultDatabase: string;
-  projectsBaseDir: string;
-  backupBaseDir: string;
-  startingPort: number;
-  websitesNetwork: string;
-  infraNetwork: string;
-  npmUrl?: string;
-  npmEmail?: string;
-  npmPassword?: string;
-}
+interface ConfigData extends DefaultConfigData {}
 
 let cachedConfig: ConfigData | null = null;
 
@@ -31,29 +19,29 @@ function loadConfig(): ConfigData {
   if (existsSync(CONFIG_FILE)) {
     try {
       const content = readFileSync(CONFIG_FILE, "utf-8");
-      cachedConfig = JSON.parse(content);
-      return cachedConfig!;
+      const parsed = JSON.parse(content);
+      
+      // Merge with defaults to ensure all fields are present
+      // This handles cases where the config file is missing fields
+      const defaults = getDefaultConfig();
+      const merged: ConfigData = {
+        ...defaults,
+        ...parsed,
+        // Ensure optional fields are preserved
+        npmUrl: parsed.npmUrl ?? defaults.npmUrl,
+        npmEmail: parsed.npmEmail ?? defaults.npmEmail,
+        npmPassword: parsed.npmPassword ?? defaults.npmPassword,
+      };
+      cachedConfig = merged;
+      return merged;
     } catch (error) {
-      console.error("Error reading config.json:", error);
+      console.error("[CONFIG] Error reading config.json (corrupt or invalid), using defaults:", error);
+      // If file is corrupt, fall back to defaults
     }
   }
 
-  // Return defaults if config.json doesn't exist
-  const defaults: ConfigData = {
-    githubToken: "",
-    mongoUser: "ralf",
-    mongoPassword: "supersecret",
-    mongoDefaultDatabase: "admin",
-    projectsBaseDir: "/srv/vps/websites",
-    backupBaseDir: "/srv/vps/backups",
-    startingPort: 5000,
-    websitesNetwork: "websites_network",
-    infraNetwork: "infra_network",
-    npmUrl: process.env.NPM_URL || "http://nginx-proxy-manager:81",
-    npmEmail: process.env.NPM_EMAIL || "",
-    npmPassword: process.env.NPM_PASSWORD || "",
-  };
-  
+  // Return defaults if config.json doesn't exist or is corrupt
+  const defaults = getDefaultConfig();
   cachedConfig = defaults;
   return defaults;
 }
