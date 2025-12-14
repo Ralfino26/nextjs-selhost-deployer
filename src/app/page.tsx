@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +25,20 @@ import { Project } from "@/types/project";
 import { toast } from "sonner";
 
 export default function Home() {
+  const pathname = usePathname();
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [restarting, setRestarting] = useState<Record<string, "website" | "database" | null>>({});
 
+  // Fetch projects when component mounts or pathname changes (handles navigation)
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (pathname === "/") {
+      setLoading(true);
+      fetchProjects();
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -51,6 +57,8 @@ export default function Home() {
   }, [searchQuery, projects]);
 
   const fetchProjects = async () => {
+    // Always set loading to true at the start
+    setLoading(true);
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch("/api/projects", {
@@ -60,6 +68,7 @@ export default function Home() {
       if (!response.ok) {
         const error = await response.json();
         console.error("Error fetching projects:", error);
+        setLoading(false);
         return;
       }
       
