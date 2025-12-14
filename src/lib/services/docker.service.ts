@@ -331,24 +331,12 @@ export async function deleteProject(projectName: string): Promise<void> {
     console.warn(`[DELETE] Warning: Could not check volumes:`, error);
   }
 
-  // Step 6: Remove all project files and directories
-  try {
-    console.log(`[DELETE] Removing project directory: ${projectDir}`);
-    const { rm } = await import("fs/promises");
-    const { existsSync } = await import("fs");
-    
-    if (existsSync(projectDir)) {
-      await rm(projectDir, { recursive: true, force: true });
-      console.log(`[DELETE] ✓ Project directory removed`);
-    } else {
-      console.log(`[DELETE] Project directory does not exist (already removed)`);
-    }
-  } catch (error) {
-    console.error(`[DELETE] Error removing project directory:`, error);
-    throw new Error(`Failed to remove project directory: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  // Step 6: DO NOT remove project files - only Docker resources
+  // Files remain on the VPS for manual cleanup if needed
+  console.log(`[DELETE] Project files preserved (not removed from VPS)`);
+  console.log(`[DELETE] Project directory remains: ${projectDir}`);
 
-  console.log(`[DELETE] ✓ Complete cleanup finished for project: ${projectName}`);
+  console.log(`[DELETE] ✓ Complete Docker cleanup finished for project: ${projectName}`);
 }
 
 // Get container logs

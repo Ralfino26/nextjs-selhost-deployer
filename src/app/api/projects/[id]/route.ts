@@ -349,13 +349,13 @@ export async function DELETE(
     // 2. Remove all volumes
     // 3. Remove project-specific images
     // 4. Remove orphaned volumes
-    // 5. Remove the entire project directory (all files)
+    // NOTE: Project files are NOT removed - only Docker resources
     await deleteProject(projectName);
 
     console.log(`[API] ✓ Project ${projectName} completely deleted`);
     return NextResponse.json({ 
       success: true,
-      message: `Project ${projectName} and all associated Docker resources have been completely removed`
+      message: `All Docker resources for ${projectName} have been removed. Project files remain on the VPS.`
     });
   } catch (error) {
     console.error("Error deleting project:", error);
