@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, ArrowUp, ArrowDown, Maximize2, ExternalLink, CheckCircle2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Copy, ArrowUp, ArrowDown, Maximize2, Minimize2, ExternalLink, CheckCircle2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface DeployModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onMinimize?: () => void;
+  onRestore?: () => void;
+  isMinimized?: boolean;
   projectName: string;
   projectDomain?: string;
   deployLogs: string;
@@ -24,6 +27,9 @@ interface DeployModalProps {
 export function DeployModal({
   isOpen,
   onClose,
+  onMinimize,
+  onRestore,
+  isMinimized = false,
   projectName,
   projectDomain,
   deployLogs,
@@ -39,9 +45,9 @@ export function DeployModal({
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Prevent body scroll when modal is open
+  // Prevent body scroll when modal is open (but not when minimized)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isMinimized) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -49,7 +55,7 @@ export function DeployModal({
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isOpen]);
+  }, [isOpen, isMinimized]);
 
   // Split logs into phases - memoized
   const { databaseLogs, stoppingLogs, buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
@@ -231,6 +237,57 @@ export function DeployModal({
     }
   }, [deployLogs]);
 
+  // Minimized state: show floating button
+  if (isMinimized && isOpen) {
+    // Determine status from phases
+    const isComplete = deployPhases.deploying === "complete";
+    const isBuilding = deployPhases.building === "active" || deployPhases.building === "complete";
+    const isDeployingPhase = deployPhases.deploying === "active";
+    
+    return (
+      <div className="fixed bottom-4 right-4 z-50">
+        <button
+          onClick={onRestore}
+          className={`${
+            isComplete
+              ? "bg-green-600 hover:bg-green-700"
+              : isDeploying
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-gray-600 hover:bg-gray-700"
+          } text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all hover:scale-105 animate-pulse`}
+        >
+          {isDeploying ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : isComplete ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <Loader2 className="h-5 w-5" />
+          )}
+          <div className="text-left">
+            <div className="font-semibold text-sm">
+              {isComplete
+                ? "Deployment Complete"
+                : isDeploying
+                ? "Deploying..."
+                : "Deployment"}
+            </div>
+            <div className="text-xs opacity-90">{projectName}</div>
+            {isDeploying && (
+              <div className="text-xs opacity-75 mt-0.5">
+                {isBuilding && !isDeployingPhase
+                  ? "Building..."
+                  : isDeployingPhase
+                  ? "Deploying..."
+                  : "In progress..."}
+              </div>
+            )}
+          </div>
+          <Maximize2 className="h-4 w-4 opacity-75" />
+        </button>
+      </div>
+    );
+  }
+
   if (!isOpen) return null;
 
   return (
@@ -320,6 +377,18 @@ export function DeployModal({
                 <ArrowDown className="h-4 w-4" />
               </Button>
             </div>
+            {onMinimize && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onMinimize}
+                className="h-9 gap-2 border-gray-300 hover:bg-gray-50"
+                title="Minimize (keep running in background)"
+              >
+                <Minimize2 className="h-4 w-4" />
+                Minimize
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

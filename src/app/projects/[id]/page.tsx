@@ -34,6 +34,7 @@ export default function ProjectDetailPage() {
   }>>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showDeployLogs, setShowDeployLogs] = useState(false);
+  const [isDeployModalMinimized, setIsDeployModalMinimized] = useState(false);
   const [deployLogs, setDeployLogs] = useState<string>("");
   const [deployLogsByPhase, setDeployLogsByPhase] = useState<{
     initializing: string[];
@@ -525,6 +526,12 @@ export default function ProjectDetailPage() {
                     description: `${project?.name} has been deployed successfully`,
                   });
                   await fetchProject();
+                  // Don't auto-close if minimized - let user restore and see completion
+                  if (!isDeployModalMinimized) {
+                    setTimeout(() => {
+                      router.push(`/projects/${projectId}`);
+                    }, 2000);
+                  }
                   return;
                 }
                 
@@ -1264,16 +1271,27 @@ export default function ProjectDetailPage() {
       {/* Deploy Logs Modal - Netlify Style */}
       <DeployModal
         isOpen={showDeployLogs}
+        isMinimized={isDeployModalMinimized}
         onClose={() => {
-          setShowDeployLogs(false);
-          setDeployLogs("");
-          setDeployPhases({
-            initializing: "pending",
-            building: "pending",
-            deploying: "pending",
-            cleanup: "pending",
-            postProcessing: "pending",
-          });
+          // Only allow closing if not deploying
+          if (actionLoading !== "deploy") {
+            setShowDeployLogs(false);
+            setIsDeployModalMinimized(false);
+            setDeployLogs("");
+            setDeployPhases({
+              initializing: "pending",
+              building: "pending",
+              deploying: "pending",
+              cleanup: "pending",
+              postProcessing: "pending",
+            });
+          }
+        }}
+        onMinimize={() => {
+          setIsDeployModalMinimized(true);
+        }}
+        onRestore={() => {
+          setIsDeployModalMinimized(false);
         }}
         projectName={project?.name || ""}
         projectDomain={project?.domain}
