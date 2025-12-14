@@ -64,12 +64,31 @@ export default function ProjectDetailPage() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [gitStatus, setGitStatus] = useState<{
+    isBehind: boolean;
+    commitsBehind: number;
+    currentBranch?: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchProject();
     fetchEnvVars();
     fetchEnvComparison();
+    fetchGitStatus();
   }, [projectId]);
+
+  // Auto-refresh project data, git status, and env comparison every 30 seconds
+  useEffect(() => {
+    if (!autoRefresh || !project) return;
+
+    const interval = setInterval(() => {
+      fetchProject(true); // Silent refresh
+      fetchGitStatus();
+      fetchEnvComparison();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, project, projectId]);
 
   // Suppress browser extension errors and other non-critical errors
   useEffect(() => {
@@ -247,6 +266,26 @@ export default function ProjectDetailPage() {
       }
     } catch (error) {
       console.error("Error fetching logs:", error);
+    }
+  };
+
+  const fetchGitStatus = async () => {
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/git-status`, {
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setGitStatus({
+          isBehind: data.isBehind || false,
+          commitsBehind: data.commitsBehind || 0,
+          currentBranch: data.currentBranch,
+        });
+      }
+    } catch (error) {
+      // Silently fail - git status check is optional
+      console.debug("Error fetching git status:", error);
     }
   };
 
@@ -532,6 +571,7 @@ export default function ProjectDetailPage() {
           description: data.message || "Successfully pulled latest changes from GitHub",
         });
         await fetchProject();
+        await fetchGitStatus(); // Refresh git status after pull
       } else {
         const error = await response.json();
         toast.error("Update failed", {
@@ -1261,7 +1301,11 @@ export default function ProjectDetailPage() {
                 variant="outline"
                 onClick={handleUpdate}
                 disabled={actionLoading !== null}
-                className="min-w-[120px]"
+                className={`min-w-[120px] ${
+                  gitStatus?.isBehind
+                    ? "animate-pulse border-orange-500 bg-orange-50 hover:bg-orange-100"
+                    : ""
+                }`}
               >
                 {actionLoading === "update" ? (
                   <>
@@ -1270,8 +1314,15 @@ export default function ProjectDetailPage() {
                   </>
                 ) : (
                   <>
-                    <span className="mr-2">📥</span>
+                    <span className="mr-2">
+                      {gitStatus?.isBehind ? "⚠️" : "📥"}
+                    </span>
                     Git pull
+                    {gitStatus?.isBehind && gitStatus.commitsBehind > 0 && (
+                      <span className="ml-2 text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">
+                        {gitStatus.commitsBehind}
+                      </span>
+                    )}
                   </>
                 )}
               </Button>

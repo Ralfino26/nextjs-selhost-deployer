@@ -8,6 +8,7 @@ export interface Project {
   status: "Running" | "Stopped" | "Building" | "Error";
   lastDeployment?: string;
   directory: string;
+  gitBehind?: boolean; // True if project is behind the remote repository
 }
 
 export interface ProjectDetails extends Project {

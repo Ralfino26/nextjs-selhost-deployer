@@ -17,7 +17,8 @@ import {
   XCircle,
   Globe,
   Settings,
-  RefreshCw
+  RefreshCw,
+  GitBranch
 } from "lucide-react";
 import { Project } from "@/types/project";
 import { toast } from "sonner";
@@ -273,9 +274,17 @@ export default function Home() {
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate mb-1">
-                    {project.name}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      {project.name}
+                    </h3>
+                    {project.gitBehind && (
+                      <span className="flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full border border-orange-300 animate-pulse">
+                        <GitBranch className="h-3 w-3" />
+                        Behind
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 truncate">
                     {project.repo}
                   </p>

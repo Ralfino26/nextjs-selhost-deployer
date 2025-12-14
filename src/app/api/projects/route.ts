@@ -107,7 +107,78 @@ export async function GET() {
 
       const domains = await Promise.all(domainPromises);
 
-      // Combine project data with domains
+      // Check git status for each project (with timeout to prevent hanging)
+      const { exec } = await import("child_process");
+      const { promisify } = await import("util");
+      const execAsync = promisify(exec);
+      
+      const gitStatusPromises = projectData.map(async (data) => {
+        try {
+          const projectDir = join(baseDir, data.name);
+          const projectSubDirs = await readdir(projectDir, { withFileTypes: true });
+          const repoDir = projectSubDirs.find(
+            (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
+          );
+          
+          if (!repoDir) {
+            return { isBehind: false };
+          }
+          
+          const repoPath = join(projectDir, repoDir.name);
+          
+          // Quick check: fetch and compare (with timeout)
+          const statusPromise = (async () => {
+            try {
+              await execAsync("git fetch origin", {
+                cwd: repoPath,
+                shell: "/bin/sh",
+                env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+                timeout: 5000,
+              });
+              
+              const branchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
+                cwd: repoPath,
+                shell: "/bin/sh",
+                env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+                timeout: 2000,
+              });
+              const currentBranch = branchResult.stdout.trim();
+              
+              const localResult = await execAsync("git rev-parse HEAD", {
+                cwd: repoPath,
+                shell: "/bin/sh",
+                env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+                timeout: 2000,
+              });
+              const localCommit = localResult.stdout.trim();
+              
+              const remoteResult = await execAsync(`git rev-parse origin/${currentBranch}`, {
+                cwd: repoPath,
+                shell: "/bin/sh",
+                env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+                timeout: 2000,
+              });
+              const remoteCommit = remoteResult.stdout.trim();
+              
+              return { isBehind: localCommit !== remoteCommit };
+            } catch {
+              return { isBehind: false };
+            }
+          })();
+          
+          const timeoutPromise = new Promise<{ isBehind: boolean }>((resolve) =>
+            setTimeout(() => resolve({ isBehind: false }), 8000) // 8 second timeout
+          );
+          
+          return await Promise.race([statusPromise, timeoutPromise]);
+        } catch {
+          return { isBehind: false };
+        }
+      });
+      
+      const gitStatuses = await Promise.all(gitStatusPromises);
+
+      // Combine project data with domains and git status
       for (let i = 0; i < projectData.length; i++) {
         projects.push({
           id: projectData[i].name,
@@ -118,6 +189,7 @@ export async function GET() {
           createDatabase: projectData[i].hasDatabase,
           status: projectData[i].status,
           directory: projectData[i].directory,
+          gitBehind: gitStatuses[i]?.isBehind || false,
         });
       }
     } catch (error: any) {
