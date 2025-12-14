@@ -102,16 +102,27 @@ export async function detectStaticExport(repoPath: string): Promise<boolean> {
         }
         
         // Also check for output: "export" in object syntax (common in TypeScript)
+        // This handles cases like: output: 'export' or output: "export"
         if (content.includes("output") && (content.includes("'export'") || content.includes('"export"'))) {
           // More specific check: look for output property with export value
           const lines = content.split("\n");
           for (const line of lines) {
             const trimmed = line.trim();
+            // Check for: output: 'export', output: "export", output: 'export', etc.
             if (trimmed.includes("output") && (trimmed.includes("'export'") || trimmed.includes('"export"'))) {
               console.log(`[SSG DETECT] Found static export in ${configFile.path} (line: ${trimmed})`);
               return true;
             }
           }
+        }
+        
+        // Also check for output: 'export' in TypeScript/JavaScript object syntax
+        // Handles cases like: const config = { output: 'export' }
+        // or: export default { output: 'export' }
+        const outputExportRegex = /output\s*:\s*['"]export['"]/;
+        if (outputExportRegex.test(content)) {
+          console.log(`[SSG DETECT] Found static export pattern in ${configFile.path}`);
+          return true;
         }
       } catch (error) {
         console.warn(`[SSG DETECT] Could not read ${configFile.path}:`, error);
@@ -143,6 +154,41 @@ export async function detectStaticExport(repoPath: string): Promise<boolean> {
   if (existsSync(outDir)) {
     console.log(`[SSG DETECT] Found 'out' directory, likely SSG site`);
     return true;
+  }
+
+  // Check if app directory exists and has no server components
+  // Next.js 13+ with app router can generate static sites without output: 'export'
+  // if all pages are static (no server components, no API routes)
+  const appDir = join(repoPath, "app");
+  const pagesDir = join(repoPath, "pages");
+  const hasAppDir = existsSync(appDir);
+  const hasPagesDir = existsSync(pagesDir);
+  
+  // Check for API routes - if no API routes exist, it might be SSG
+  if (hasAppDir) {
+    const apiRoute = join(appDir, "api");
+    if (!existsSync(apiRoute)) {
+      // No API routes, check if there are any server components
+      // For now, if there's no output: 'export' but also no API routes,
+      // we'll assume it's SSG if the user wants static export
+      // But we need to be more careful here - let's check package.json for hints
+      try {
+        const packageJsonPath = join(repoPath, "package.json");
+        if (existsSync(packageJsonPath)) {
+          const packageJsonContent = await readFile(packageJsonPath, "utf-8");
+          const packageJson = JSON.parse(packageJsonContent);
+          
+          // If build script doesn't include 'start', it might be SSG
+          // (SSG sites don't need a start script)
+          if (!packageJson.scripts?.start && !packageJson.scripts?.start?.includes("next start")) {
+            console.log(`[SSG DETECT] No start script found, might be SSG`);
+            // Don't return true here, just log - we need output: 'export' to be sure
+          }
+        }
+      } catch (error) {
+        // Ignore
+      }
+    }
   }
 
   return false;
