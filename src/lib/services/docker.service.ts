@@ -194,29 +194,161 @@ export async function stopProject(projectName: string): Promise<void> {
   });
 }
 
-// Delete a project (stop and remove containers)
+// Delete a project completely - removes all Docker resources and files
 export async function deleteProject(projectName: string): Promise<void> {
   const projectDir = join(config.projectsBaseDir, projectName);
   const dockerComposeDir = join(projectDir, "docker");
   const databaseDir = join(projectDir, "database");
 
-  // Stop and remove main service
+  console.log(`[DELETE] Starting complete cleanup for project: ${projectName}`);
+
+  // Step 1: Stop and remove main service containers and volumes
   try {
-    await execAsync(`docker compose down -v`, {
+    console.log(`[DELETE] Stopping and removing main service containers...`);
+    await execAsync(`docker compose down -v --remove-orphans`, {
       cwd: dockerComposeDir,
     });
+    console.log(`[DELETE] ✓ Main service containers removed`);
   } catch (error) {
-    console.error(`Failed to remove main service:`, error);
+    console.warn(`[DELETE] Warning: Failed to remove main service (might not exist):`, error);
   }
 
-  // Stop and remove database if exists
+  // Step 2: Stop and remove database containers and volumes
   try {
-    await execAsync(`docker compose down -v`, {
+    console.log(`[DELETE] Stopping and removing database containers...`);
+    await execAsync(`docker compose down -v --remove-orphans`, {
       cwd: databaseDir,
     });
+    console.log(`[DELETE] ✓ Database containers removed`);
   } catch (error) {
     // Database might not exist, ignore
+    console.log(`[DELETE] No database to remove (this is OK)`);
   }
+
+  // Step 3: Remove containers by name (in case compose didn't catch them)
+  const mainContainerName = projectName;
+  const dbContainerName = `${projectName}-mongo`;
+  
+  try {
+    const docker = await getDocker();
+    
+    // Remove main container if it exists
+    try {
+      const mainContainer = docker.getContainer(mainContainerName);
+      const mainInfo = await mainContainer.inspect();
+      if (mainInfo) {
+        console.log(`[DELETE] Removing container: ${mainContainerName}`);
+        if (mainInfo.State.Running) {
+          await mainContainer.stop();
+        }
+        await mainContainer.remove({ force: true, v: true });
+        console.log(`[DELETE] ✓ Container ${mainContainerName} removed`);
+      }
+    } catch (error: any) {
+      if (error.statusCode !== 404) {
+        console.warn(`[DELETE] Warning removing container ${mainContainerName}:`, error.message);
+      }
+    }
+
+    // Remove database container if it exists
+    try {
+      const dbContainer = docker.getContainer(dbContainerName);
+      const dbInfo = await dbContainer.inspect();
+      if (dbInfo) {
+        console.log(`[DELETE] Removing container: ${dbContainerName}`);
+        if (dbInfo.State.Running) {
+          await dbContainer.stop();
+        }
+        await dbContainer.remove({ force: true, v: true });
+        console.log(`[DELETE] ✓ Container ${dbContainerName} removed`);
+      }
+    } catch (error: any) {
+      if (error.statusCode !== 404) {
+        console.warn(`[DELETE] Warning removing container ${dbContainerName}:`, error.message);
+      }
+    }
+  } catch (error) {
+    console.warn(`[DELETE] Warning: Could not access Docker API:`, error);
+  }
+
+  // Step 4: Remove project-specific images
+  try {
+    console.log(`[DELETE] Removing project-specific images...`);
+    const { exec } = await import("child_process");
+    const { promisify } = await import("util");
+    const execAsync = promisify(exec);
+
+    // Try to remove images that match the project name pattern
+    // Docker Compose typically creates images like: {projectName} or docker-{projectName}
+    const imagePatterns = [
+      projectName,
+      `docker-${projectName}`,
+      `${projectName}:latest`,
+      `docker-${projectName}:latest`,
+    ];
+
+    for (const pattern of imagePatterns) {
+      try {
+        await execAsync(`docker rmi -f ${pattern} 2>/dev/null || true`);
+        console.log(`[DELETE] Attempted to remove image: ${pattern}`);
+      } catch (error) {
+        // Image might not exist, ignore
+      }
+    }
+    console.log(`[DELETE] ✓ Images cleanup attempted`);
+  } catch (error) {
+    console.warn(`[DELETE] Warning: Could not remove images:`, error);
+  }
+
+  // Step 5: Remove orphaned volumes (volumes that might be named after the project)
+  try {
+    console.log(`[DELETE] Checking for orphaned volumes...`);
+    const { exec } = await import("child_process");
+    const { promisify } = await import("util");
+    const execAsync = promisify(exec);
+
+    // List all volumes and filter for project-specific ones
+    const result = await execAsync(`docker volume ls -q`);
+    const volumes = result.stdout.trim().split("\n").filter(Boolean);
+    
+    const projectVolumes = volumes.filter((vol: string) => 
+      vol.includes(projectName) || vol.includes(`docker-${projectName}`)
+    );
+
+    for (const volume of projectVolumes) {
+      try {
+        await execAsync(`docker volume rm -f ${volume}`);
+        console.log(`[DELETE] ✓ Removed volume: ${volume}`);
+      } catch (error) {
+        console.warn(`[DELETE] Warning: Could not remove volume ${volume}:`, error);
+      }
+    }
+    
+    if (projectVolumes.length === 0) {
+      console.log(`[DELETE] No orphaned volumes found`);
+    }
+  } catch (error) {
+    console.warn(`[DELETE] Warning: Could not check volumes:`, error);
+  }
+
+  // Step 6: Remove all project files and directories
+  try {
+    console.log(`[DELETE] Removing project directory: ${projectDir}`);
+    const { rm } = await import("fs/promises");
+    const { existsSync } = await import("fs");
+    
+    if (existsSync(projectDir)) {
+      await rm(projectDir, { recursive: true, force: true });
+      console.log(`[DELETE] ✓ Project directory removed`);
+    } else {
+      console.log(`[DELETE] Project directory does not exist (already removed)`);
+    }
+  } catch (error) {
+    console.error(`[DELETE] Error removing project directory:`, error);
+    throw new Error(`Failed to remove project directory: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  console.log(`[DELETE] ✓ Complete cleanup finished for project: ${projectName}`);
 }
 
 // Get container logs

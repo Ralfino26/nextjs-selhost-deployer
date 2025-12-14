@@ -332,7 +332,7 @@ export async function GET(
   }
 }
 
-// DELETE /api/projects/[id] - Delete a project
+// DELETE /api/projects/[id] - Delete a project completely (all Docker resources + files)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -342,13 +342,28 @@ export async function DELETE(
     const projectName = id;
     const { deleteProject } = await import("@/lib/services/docker.service");
     
+    console.log(`[API] Starting complete project deletion for: ${projectName}`);
+    
+    // This will:
+    // 1. Stop and remove all containers (main + database)
+    // 2. Remove all volumes
+    // 3. Remove project-specific images
+    // 4. Remove orphaned volumes
+    // 5. Remove the entire project directory (all files)
     await deleteProject(projectName);
 
-    return NextResponse.json({ success: true });
+    console.log(`[API] ✓ Project ${projectName} completely deleted`);
+    return NextResponse.json({ 
+      success: true,
+      message: `Project ${projectName} and all associated Docker resources have been completely removed`
+    });
   } catch (error) {
     console.error("Error deleting project:", error);
     return NextResponse.json(
-      { error: "Failed to delete project" },
+      { 
+        error: "Failed to delete project",
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
