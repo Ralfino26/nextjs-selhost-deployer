@@ -3,7 +3,6 @@ import { readFile, writeFile, rename, unlink } from "fs/promises";
 import { join } from "path";
 import { z } from "zod";
 import { clearConfigCache } from "@/lib/config";
-import { getDefaultConfig } from "@/lib/config-defaults";
 
 const configSchema = z.object({
   githubToken: z.string(),
@@ -27,32 +26,17 @@ export async function GET() {
   try {
     try {
       const content = await readFile(CONFIG_FILE, "utf-8");
-      const parsed = JSON.parse(content);
-      
-      // Merge with defaults to ensure all fields are present
-      // This handles cases where the config file is missing fields or is corrupt
-      const defaults = getDefaultConfig();
-      const config = {
-        ...defaults,
-        ...parsed,
-        // Ensure optional fields are preserved
-        npmUrl: parsed.npmUrl ?? defaults.npmUrl,
-        npmEmail: parsed.npmEmail ?? defaults.npmEmail,
-        npmPassword: parsed.npmPassword ?? defaults.npmPassword,
-      };
-      
+      const config = JSON.parse(content);
+      // Return exactly what's in config.json, nothing more
       return NextResponse.json(config);
     } catch (error) {
-      // Config file doesn't exist or is corrupt, return defaults
-      console.warn("[SETTINGS] Config file missing or corrupt, returning defaults:", error);
-      const defaults = getDefaultConfig();
-      return NextResponse.json(defaults);
+      // Config file doesn't exist or is corrupt, return empty object
+      console.warn("[SETTINGS] Config file missing or corrupt:", error);
+      return NextResponse.json({});
     }
   } catch (error) {
     console.error("[SETTINGS] Error fetching settings:", error);
-    // Even if something goes wrong, return defaults so the app keeps working
-    const defaults = getDefaultConfig();
-    return NextResponse.json(defaults);
+    return NextResponse.json({});
   }
 }
 
@@ -62,24 +46,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Load existing config first to preserve values that aren't being updated
-    const defaults = getDefaultConfig();
-    let existingConfig: any = { ...defaults };
+    let existingConfig: any = {};
     try {
       const content = await readFile(CONFIG_FILE, "utf-8");
-      const parsed = JSON.parse(content);
-      // Merge with defaults to ensure all fields are present
-      existingConfig = {
-        ...defaults,
-        ...parsed,
-        npmUrl: parsed.npmUrl ?? defaults.npmUrl,
-        npmEmail: parsed.npmEmail ?? defaults.npmEmail,
-        npmPassword: parsed.npmPassword ?? defaults.npmPassword,
-      };
+      existingConfig = JSON.parse(content);
       console.log("[SETTINGS] Loaded existing config");
     } catch (error) {
-      // Config file doesn't exist or is corrupt, use defaults
-      console.warn("[SETTINGS] Config file missing or corrupt, using defaults:", error);
-      existingConfig = defaults;
+      // Config file doesn't exist or is corrupt, start with empty object
+      console.warn("[SETTINGS] Config file missing or corrupt, starting fresh:", error);
+      existingConfig = {};
     }
 
     // Merge: only update fields that are provided in the request body
@@ -116,12 +91,9 @@ export async function POST(request: NextRequest) {
     const { mkdir } = await import("fs/promises");
     await mkdir(join(process.cwd(), "data"), { recursive: true });
 
-    // Ensure optional fields are included (preserve existing if not provided)
+    // Use exactly what was provided - no defaults, no fallbacks
     const configToSave = {
       ...config,
-      npmUrl: config.npmUrl || existingConfig.npmUrl || "",
-      npmEmail: config.npmEmail || existingConfig.npmEmail || "",
-      npmPassword: config.npmPassword || existingConfig.npmPassword || "",
     };
 
     console.log("[SETTINGS] Saving config with fields:", Object.keys(configToSave));

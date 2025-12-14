@@ -12,22 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-// Client-side defaults (must match server-side defaults)
-// These are used as placeholders and fallbacks
-const CLIENT_DEFAULTS: Config = {
-  githubToken: "",
-  mongoUser: "ralf",
-  mongoPassword: "supersecret",
-  mongoDefaultDatabase: "admin",
-  projectsBaseDir: "/srv/vps/websites",
-  backupBaseDir: "/srv/vps/backups",
-  startingPort: 5000,
-  websitesNetwork: "websites_network",
-  infraNetwork: "infra_network",
-  npmUrl: "http://nginx-proxy-manager:81",
-  npmEmail: "",
-  npmPassword: "",
-};
 
 interface Config {
   githubToken: string;
@@ -45,9 +29,21 @@ interface Config {
 }
 
 export default function SettingsPage() {
-  // Initialize with defaults - these will always work
-  const defaults = CLIENT_DEFAULTS;
-  const [config, setConfig] = useState<Config>(defaults);
+  // Initialize empty - will be loaded from config.json
+  const [config, setConfig] = useState<Config>({
+    githubToken: "",
+    mongoUser: "",
+    mongoPassword: "",
+    mongoDefaultDatabase: "",
+    projectsBaseDir: "",
+    backupBaseDir: "",
+    startingPort: 0,
+    websitesNetwork: "",
+    infraNetwork: "",
+    npmUrl: "",
+    npmEmail: "",
+    npmPassword: "",
+  });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -63,23 +59,11 @@ export default function SettingsPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        // Merge with defaults to ensure all fields are present
-        setConfig({
-          ...defaults,
-          ...data,
-          npmUrl: data.npmUrl ?? defaults.npmUrl,
-          npmEmail: data.npmEmail ?? defaults.npmEmail,
-          npmPassword: data.npmPassword ?? defaults.npmPassword,
-        });
-      } else {
-        // If fetch fails, use defaults
-        console.warn("Failed to fetch config, using defaults");
-        setConfig(defaults);
+        // Use exactly what comes from config.json, nothing more
+        setConfig(data);
       }
     } catch (error) {
-      console.error("Error fetching config, using defaults:", error);
-      // Always fall back to defaults on error
-      setConfig(defaults);
+      console.error("Error fetching config:", error);
     }
   };
 
@@ -102,23 +86,20 @@ export default function SettingsPage() {
         latestConfig = { ...latestConfig, ...config };
       }
 
-      // Ensure all required fields are present with defaults if missing
+      // Use exactly what's in the form - no defaults, no fallbacks
       const configToSave: Config = {
-        ...defaults,
-        ...latestConfig,
-        // Use defaults for any missing fields
-        githubToken: latestConfig.githubToken ?? defaults.githubToken,
-        mongoUser: latestConfig.mongoUser ?? defaults.mongoUser,
-        mongoPassword: latestConfig.mongoPassword ?? defaults.mongoPassword,
-        mongoDefaultDatabase: latestConfig.mongoDefaultDatabase ?? defaults.mongoDefaultDatabase,
-        projectsBaseDir: latestConfig.projectsBaseDir ?? defaults.projectsBaseDir,
-        backupBaseDir: latestConfig.backupBaseDir ?? defaults.backupBaseDir,
-        startingPort: latestConfig.startingPort ?? defaults.startingPort,
-        websitesNetwork: latestConfig.websitesNetwork ?? defaults.websitesNetwork,
-        infraNetwork: latestConfig.infraNetwork ?? defaults.infraNetwork,
-        npmUrl: latestConfig.npmUrl ?? defaults.npmUrl,
-        npmEmail: latestConfig.npmEmail ?? defaults.npmEmail,
-        npmPassword: latestConfig.npmPassword ?? defaults.npmPassword,
+        githubToken: latestConfig.githubToken || "",
+        mongoUser: latestConfig.mongoUser || "",
+        mongoPassword: latestConfig.mongoPassword || "",
+        mongoDefaultDatabase: latestConfig.mongoDefaultDatabase || "",
+        projectsBaseDir: latestConfig.projectsBaseDir || "",
+        backupBaseDir: latestConfig.backupBaseDir || "",
+        startingPort: latestConfig.startingPort || 0,
+        websitesNetwork: latestConfig.websitesNetwork || "",
+        infraNetwork: latestConfig.infraNetwork || "",
+        npmUrl: latestConfig.npmUrl || "",
+        npmEmail: latestConfig.npmEmail || "",
+        npmPassword: latestConfig.npmPassword || "",
       };
 
       const response = await fetch("/api/settings", {
@@ -163,7 +144,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, githubToken: e.target.value })
                 }
-                placeholder={defaults.githubToken || "ghp_..."}
+                placeholder=""
               />
               <p className="mt-1 text-xs text-gray-700">
                 Required for private repositories. Generate at{" "}
@@ -191,7 +172,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, mongoUser: e.target.value })
                 }
-                placeholder={defaults.mongoUser}
+                placeholder=""
               />
             </div>
             <div>
@@ -203,7 +184,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, mongoPassword: e.target.value })
                 }
-                placeholder={defaults.mongoPassword}
+                placeholder=""
               />
             </div>
             <div>
@@ -214,7 +195,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, mongoDefaultDatabase: e.target.value })
                 }
-                placeholder={defaults.mongoDefaultDatabase}
+                placeholder=""
               />
             </div>
           </div>
@@ -227,11 +208,11 @@ export default function SettingsPage() {
               <Label htmlFor="npmUrl">NPM URL</Label>
               <Input
                 id="npmUrl"
-                value={config.npmUrl || defaults.npmUrl}
+                value={config.npmUrl || ""}
                 onChange={(e) =>
                   setConfig({ ...config, npmUrl: e.target.value })
                 }
-                placeholder={defaults.npmUrl}
+                placeholder=""
               />
               <p className="mt-1 text-xs text-gray-700">
                 URL to access Nginx Proxy Manager API (usually http://nginx-proxy-manager:81 or http://localhost:81)
@@ -246,7 +227,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, npmEmail: e.target.value })
                 }
-                placeholder={defaults.npmEmail || "admin@example.com"}
+                placeholder=""
               />
               <p className="mt-1 text-xs text-gray-700">
                 Email address used to login to Nginx Proxy Manager
@@ -261,7 +242,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, npmPassword: e.target.value })
                 }
-                placeholder={defaults.npmPassword || "Your NPM password"}
+                placeholder=""
               />
               <p className="mt-1 text-xs text-gray-700">
                 Password for Nginx Proxy Manager login
@@ -281,7 +262,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, projectsBaseDir: e.target.value })
                 }
-                placeholder={defaults.projectsBaseDir}
+                placeholder=""
               />
             </div>
             <div>
@@ -292,7 +273,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, backupBaseDir: e.target.value })
                 }
-                placeholder={defaults.backupBaseDir}
+                placeholder=""
               />
               <p className="mt-1 text-xs text-gray-700">
                 Directory where MongoDB backups will be stored
@@ -310,7 +291,7 @@ export default function SettingsPage() {
                     startingPort: parseInt(e.target.value, 10),
                   })
                 }
-                placeholder={defaults.startingPort.toString()}
+                placeholder=""
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -322,7 +303,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setConfig({ ...config, websitesNetwork: e.target.value })
                   }
-                  placeholder={defaults.websitesNetwork}
+                  placeholder=""
                 />
               </div>
               <div>
@@ -333,7 +314,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setConfig({ ...config, infraNetwork: e.target.value })
                   }
-                  placeholder={defaults.infraNetwork}
+                  placeholder=""
                 />
               </div>
             </div>
