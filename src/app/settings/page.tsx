@@ -85,10 +85,14 @@ export default function SettingsPage() {
       }
 
       // Ensure all required fields are present with defaults if missing
+      // For password fields, only include if they have a value (to avoid clearing existing passwords)
       const configToSave: Config = {
         githubToken: latestConfig.githubToken || "",
         mongoUser: latestConfig.mongoUser || "ralf",
-        mongoPassword: latestConfig.mongoPassword || "supersecret",
+        // Only send mongoPassword if it's been changed (not empty)
+        mongoPassword: latestConfig.mongoPassword && latestConfig.mongoPassword !== "" 
+          ? latestConfig.mongoPassword 
+          : "supersecret", // Fallback to default if truly empty
         mongoDefaultDatabase: latestConfig.mongoDefaultDatabase || "admin",
         projectsBaseDir: latestConfig.projectsBaseDir || "/srv/vps/websites",
         backupBaseDir: latestConfig.backupBaseDir || "/srv/vps/backups",
@@ -97,6 +101,7 @@ export default function SettingsPage() {
         infraNetwork: latestConfig.infraNetwork || "infra_network",
         npmUrl: latestConfig.npmUrl || "http://nginx-proxy-manager:81",
         npmEmail: latestConfig.npmEmail || "",
+        // npmPassword: only send if it has a value (backend will preserve existing if empty)
         npmPassword: latestConfig.npmPassword || "",
       };
 

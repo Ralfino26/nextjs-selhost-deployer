@@ -85,11 +85,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Merge: only update fields that are provided in the request body
-    // This allows partial updates without losing existing values
-    const mergedConfig = {
+    // IMPORTANT: For password fields, don't overwrite with empty strings
+    // This prevents accidentally clearing passwords when user doesn't fill in the field
+    const mergedConfig: any = {
       ...existingConfig,
-      ...body, // Override with new values from request
     };
+    
+    // Update non-sensitive fields normally
+    if (body.githubToken !== undefined) mergedConfig.githubToken = body.githubToken;
+    if (body.mongoUser !== undefined) mergedConfig.mongoUser = body.mongoUser;
+    if (body.mongoPassword !== undefined && body.mongoPassword !== "") {
+      mergedConfig.mongoPassword = body.mongoPassword;
+    }
+    if (body.mongoDefaultDatabase !== undefined) mergedConfig.mongoDefaultDatabase = body.mongoDefaultDatabase;
+    if (body.projectsBaseDir !== undefined) mergedConfig.projectsBaseDir = body.projectsBaseDir;
+    if (body.backupBaseDir !== undefined) mergedConfig.backupBaseDir = body.backupBaseDir;
+    if (body.startingPort !== undefined) mergedConfig.startingPort = body.startingPort;
+    if (body.websitesNetwork !== undefined) mergedConfig.websitesNetwork = body.websitesNetwork;
+    if (body.infraNetwork !== undefined) mergedConfig.infraNetwork = body.infraNetwork;
+    
+    // Optional NPM fields: only update if provided and not empty (for passwords)
+    if (body.npmUrl !== undefined) mergedConfig.npmUrl = body.npmUrl || "";
+    if (body.npmEmail !== undefined) mergedConfig.npmEmail = body.npmEmail || "";
+    if (body.npmPassword !== undefined && body.npmPassword !== "") {
+      mergedConfig.npmPassword = body.npmPassword;
+    }
 
     // Validate the merged config
     const config = configSchema.parse(mergedConfig);
@@ -98,12 +118,12 @@ export async function POST(request: NextRequest) {
     const { mkdir } = await import("fs/promises");
     await mkdir(join(process.cwd(), "data"), { recursive: true });
 
-    // Ensure optional fields are included (even if empty)
+    // Ensure optional fields are included (preserve existing if not provided)
     const configToSave = {
       ...config,
-      npmUrl: config.npmUrl || "",
-      npmEmail: config.npmEmail || "",
-      npmPassword: config.npmPassword || "",
+      npmUrl: config.npmUrl || existingConfig.npmUrl || "",
+      npmEmail: config.npmEmail || existingConfig.npmEmail || "",
+      npmPassword: config.npmPassword || existingConfig.npmPassword || "",
     };
 
     console.log("[SETTINGS] Saving config with fields:", Object.keys(configToSave));
