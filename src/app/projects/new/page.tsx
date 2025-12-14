@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Search, Star, GitFork, Lock, Globe, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { DeployModal } from "../[id]/deploy-modal";
 
 interface GitHubRepo {
   id: number;
@@ -37,6 +38,16 @@ export default function NewProjectPage() {
     port: "",
     createDatabase: false,
     domain: "",
+  });
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [deployLogs, setDeployLogs] = useState("");
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deployPhases, setDeployPhases] = useState({
+    initializing: "pending" as "pending" | "active" | "complete",
+    building: "pending" as "pending" | "active" | "complete",
+    deploying: "pending" as "pending" | "active" | "complete",
+    cleanup: "pending" as "pending" | "active" | "complete",
+    postProcessing: "pending" as "pending" | "active" | "complete",
   });
 
   // Fetch GitHub repositories
@@ -157,9 +168,20 @@ export default function NewProjectPage() {
     if (!selectedRepo) return;
     
     setLoading(true);
+    setShowDeployModal(true);
+    setDeployLogs("");
+    setIsDeploying(true);
+    setDeployPhases({
+      initializing: "active",
+      building: "pending",
+      deploying: "pending",
+      cleanup: "pending",
+      postProcessing: "pending",
+    });
+    
     try {
       const auth = sessionStorage.getItem("auth");
-      const response = await fetch("/api/projects", {
+      const response = await fetch("/api/projects/create/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -176,18 +198,67 @@ export default function NewProjectPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error("Error creating project", {
-          description: error.error || "Unknown error",
-        });
-        return;
+        throw new Error("Failed to start project creation");
       }
 
-      toast.success("Project created", {
-        description: `${formData.projectName} has been created successfully`,
-      });
-      router.push(`/projects/${formData.projectName}`);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.log) {
+                setDeployLogs((prev) => prev + data.log);
+                
+                // Update phases based on log content
+                if (data.log.includes("🗄️  Setting up database") || data.log.includes("Setting up database")) {
+                  setDeployPhases((prev) => ({ ...prev, initializing: "active" }));
+                }
+                if (data.log.includes("✅ Database started successfully")) {
+                  setDeployPhases((prev) => ({ ...prev, initializing: "complete" }));
+                }
+                if (data.log.includes("🔨 Building images") || data.log.includes("Building images")) {
+                  setDeployPhases((prev) => ({ ...prev, building: "active" }));
+                }
+                if (data.log.includes("✅ Build completed")) {
+                  setDeployPhases((prev) => ({ ...prev, building: "complete" }));
+                }
+                if (data.log.includes("🚀 Starting containers") || data.log.includes("Starting containers")) {
+                  setDeployPhases((prev) => ({ ...prev, deploying: "active" }));
+                }
+                if (data.log.includes("✅ Deployment completed")) {
+                  setDeployPhases((prev) => ({ ...prev, deploying: "complete" }));
+                }
+                if (data.log === "DONE") {
+                  setIsDeploying(false);
+                  setTimeout(() => {
+                    router.push(`/projects/${formData.projectName}`);
+                  }, 2000);
+                }
+              }
+            } catch (e) {
+              // Ignore JSON parse errors
+            }
+          }
+        }
+      }
     } catch (error: any) {
+      setIsDeploying(false);
       toast.error("Failed to create project", {
         description: error.message || "Failed to create project",
       });
@@ -474,6 +545,21 @@ export default function NewProjectPage() {
           </div>
         )}
       </div>
+
+      {/* Deploy Modal */}
+      <DeployModal
+        isOpen={showDeployModal}
+        onClose={() => {
+          if (!isDeploying) {
+            setShowDeployModal(false);
+          }
+        }}
+        projectName={formData.projectName}
+        projectDomain={formData.domain}
+        deployLogs={deployLogs}
+        deployPhases={deployPhases}
+        isDeploying={isDeploying}
+      />
     </div>
   );
 }

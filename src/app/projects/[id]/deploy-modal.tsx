@@ -32,6 +32,7 @@ export function DeployModal({
 }: DeployModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({
+    database: true,
     stopping: true,
     building: true,
     deploying: false,
@@ -51,7 +52,9 @@ export function DeployModal({
   }, [isOpen]);
 
   // Split logs into phases - memoized
-  const { stoppingLogs, buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
+  const { databaseLogs, stoppingLogs, buildLogs, deployLogs: deployPhaseLogs } = useMemo(() => {
+    const databaseStartMarker = "🗄️  Setting up database";
+    const databaseEndMarker = "✅ Database started successfully";
     const stopStartMarker = "🛑 Stopping containers";
     const stopEndMarker = "✅ Containers stopped";
     const buildStartMarker = "🔨 Building images";
@@ -59,14 +62,23 @@ export function DeployModal({
     const deployStartMarker = "🚀 Starting containers";
     const deployEndMarker = "✅ Deployment completed";
 
+    const databaseLogsArray: string[] = [];
     const stoppingLogsArray: string[] = [];
     const buildLogsArray: string[] = [];
     const deployLogsArray: string[] = [];
-    let currentPhase: "stopping" | "build" | "deploy" | null = null;
+    let currentPhase: "database" | "stopping" | "build" | "deploy" | null = null;
 
     const lines = deployLogs.split("\n");
     for (const line of lines) {
-      if (line.includes(stopStartMarker) || line.includes("Stopping containers")) {
+      if (line.includes(databaseStartMarker) || line.includes("Setting up database") || line.includes("Starting database container")) {
+        currentPhase = "database";
+        databaseLogsArray.push(line);
+      } else if (line.includes(databaseEndMarker) || line.includes("Database started successfully")) {
+        if (currentPhase === "database") {
+          databaseLogsArray.push(line);
+        }
+        currentPhase = null;
+      } else if (line.includes(stopStartMarker) || line.includes("Stopping containers")) {
         currentPhase = "stopping";
         stoppingLogsArray.push(line);
       } else if (line.includes(stopEndMarker) || line.includes("Containers stopped")) {
@@ -91,7 +103,9 @@ export function DeployModal({
         }
         currentPhase = null;
       } else {
-        if (currentPhase === "stopping") {
+        if (currentPhase === "database") {
+          databaseLogsArray.push(line);
+        } else if (currentPhase === "stopping") {
           stoppingLogsArray.push(line);
         } else if (currentPhase === "build") {
           buildLogsArray.push(line);
@@ -101,10 +115,17 @@ export function DeployModal({
       }
     }
 
-    return { stoppingLogs: stoppingLogsArray, buildLogs: buildLogsArray, deployLogs: deployLogsArray };
+    return { databaseLogs: databaseLogsArray, stoppingLogs: stoppingLogsArray, buildLogs: buildLogsArray, deployLogs: deployLogsArray };
   }, [deployLogs]);
 
   // Format logs with line numbers - memoized
+  const databaseLogLines = useMemo(() => {
+    return databaseLogs.map((line, index) => ({
+      number: index + 1,
+      content: line,
+    }));
+  }, [databaseLogs]);
+
   const stoppingLogLines = useMemo(() => {
     return stoppingLogs.map((line, index) => ({
       number: index + 1,
@@ -313,9 +334,9 @@ export function DeployModal({
 
         {/* Logs Container with Collapsible Sections */}
         <div 
-          className="flex-1 min-h-0 bg-gray-900 overflow-hidden flex flex-col" 
-          id="deploy-logs-container"
-        >
+            className="flex-1 min-h-0 bg-gray-900 overflow-hidden flex flex-col" 
+            id="deploy-logs-container"
+          >
           <div 
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto min-h-0"
@@ -332,6 +353,85 @@ export function DeployModal({
               WebkitOverflowScrolling: "touch"
             }}
           >
+            {/* Database Phase */}
+            {(databaseLogs.length > 0 || deployPhases.initializing === "active") && (
+              <div className="border-b border-gray-700">
+                {/* Phase Header - Always clickable */}
+                <button
+                  onClick={() => togglePhase("database")}
+                  className="w-full relative bg-gray-800 hover:bg-gray-700 text-left transition-colors duration-150"
+                >
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {expandedPhases.database ? (
+                        <ChevronDown className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      )}
+                      <h3 className="font-semibold text-base text-white">Database Setup</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {databaseLogs.length > 0 && databaseLogs.some(line => line.includes("✅ Database started successfully")) && (
+                        <span className="flex items-center gap-2 text-green-400">
+                          <CheckCircle2 className="h-5 w-5" />
+                          <span className="text-xs font-medium bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full border border-green-700">
+                            Complete
+                          </span>
+                        </span>
+                      )}
+                      {databaseLogs.length > 0 && !databaseLogs.some(line => line.includes("✅ Database started successfully")) && (
+                        <span className="flex items-center gap-2 text-blue-400">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span className="text-xs font-medium bg-blue-900/30 text-blue-400 px-3 py-1.5 rounded-full border border-blue-700">
+                            In progress
+                          </span>
+                        </span>
+                      )}
+                      {databaseLogs.length > 0 && (
+                        <span className="text-xs text-gray-400 font-mono bg-gray-700/50 px-2 py-1 rounded">
+                          {databaseLogs.length} lines
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                
+                {/* Phase Content - Collapsible */}
+                {expandedPhases.database && (
+                  <div className="bg-black border-t border-gray-800">
+                    <div className="font-mono text-sm text-gray-100 antialiased p-6 pr-0">
+                      {databaseLogLines.length > 0 ? (
+                        <div className="space-y-0">
+                          {databaseLogLines.map((line, idx) => (
+                            <div
+                              key={idx}
+                              id={`database-L${line.number}`}
+                              className="relative pl-16 hover:bg-gray-900/50 min-h-[1.5rem] group transition-colors"
+                            >
+                              <div
+                                className="absolute left-0 top-0 h-full min-w-[4rem] text-right pr-4 text-gray-600 group-hover:text-gray-400 cursor-pointer select-none leading-[1.5rem] font-normal"
+                                data-line-number={line.number}
+                              >
+                                {line.number}
+                              </div>
+                              <div className="border-l border-gray-800 group-hover:border-gray-700 break-words pl-6 pr-4 leading-[1.5rem] whitespace-pre-wrap text-gray-200">
+                                {line.content || " "}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 pl-16 flex items-center gap-2">
+                          <span className="inline-block animate-pulse">▋</span>
+                          <span>Waiting for database logs...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Stopping Phase */}
             {(stoppingLogs.length > 0 || deployPhases.building === "active") && (
               <div className="border-b border-gray-700">
