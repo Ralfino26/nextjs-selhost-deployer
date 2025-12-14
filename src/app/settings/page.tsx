@@ -212,7 +212,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, npmUrl: e.target.value })
                 }
-                placeholder="vpsip:81"
+                placeholder="http://{VPS_IP}:81"
               />
               <p className="mt-1 text-xs text-gray-700">
                 URL to access Nginx Proxy Manager API (usually http://nginx-proxy-manager:81 or http://localhost:81)
