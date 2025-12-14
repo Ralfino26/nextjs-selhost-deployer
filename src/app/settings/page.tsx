@@ -144,7 +144,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, githubToken: e.target.value })
                 }
-                placeholder=""
+                placeholder="ghp_..."
               />
               <p className="mt-1 text-xs text-gray-700">
                 Required for private repositories. Generate at{" "}
@@ -172,7 +172,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, mongoUser: e.target.value })
                 }
-                placeholder=""
+                placeholder="e.g. ralf"
               />
             </div>
             <div>
@@ -184,7 +184,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, mongoPassword: e.target.value })
                 }
-                placeholder=""
+                placeholder="MongoDB password"
               />
             </div>
             <div>
@@ -195,7 +195,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, mongoDefaultDatabase: e.target.value })
                 }
-                placeholder=""
+                placeholder="e.g. admin"
               />
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, npmUrl: e.target.value })
                 }
-                placeholder=""
+                placeholder="http://nginx-proxy-manager:81"
               />
               <p className="mt-1 text-xs text-gray-700">
                 URL to access Nginx Proxy Manager API (usually http://nginx-proxy-manager:81 or http://localhost:81)
@@ -227,7 +227,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, npmEmail: e.target.value })
                 }
-                placeholder=""
+                placeholder="admin@example.com"
               />
               <p className="mt-1 text-xs text-gray-700">
                 Email address used to login to Nginx Proxy Manager
@@ -242,7 +242,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, npmPassword: e.target.value })
                 }
-                placeholder=""
+                placeholder="Your NPM password"
               />
               <p className="mt-1 text-xs text-gray-700">
                 Password for Nginx Proxy Manager login
@@ -262,7 +262,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, projectsBaseDir: e.target.value })
                 }
-                placeholder=""
+                placeholder="/srv/vps/websites"
               />
             </div>
             <div>
@@ -273,7 +273,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, backupBaseDir: e.target.value })
                 }
-                placeholder=""
+                placeholder="/srv/vps/backups"
               />
               <p className="mt-1 text-xs text-gray-700">
                 Directory where MongoDB backups will be stored
@@ -291,7 +291,7 @@ export default function SettingsPage() {
                     startingPort: parseInt(e.target.value, 10),
                   })
                 }
-                placeholder=""
+                placeholder="5000"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -303,7 +303,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setConfig({ ...config, websitesNetwork: e.target.value })
                   }
-                  placeholder=""
+                  placeholder="websites_network"
                 />
               </div>
               <div>
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setConfig({ ...config, infraNetwork: e.target.value })
                   }
-                  placeholder=""
+                  placeholder="infra_network"
                 />
               </div>
             </div>
