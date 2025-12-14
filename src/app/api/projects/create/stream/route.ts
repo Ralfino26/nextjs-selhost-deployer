@@ -49,10 +49,16 @@ export async function POST(request: NextRequest) {
         // Extract repo name
         const repoName = data.repo.split("/").pop() || "repo";
 
+        // Regenerate Dockerfile first to detect SSG (force overwrite)
+        sendLog("📝 Regenerating Dockerfile (checking for SSG)...\n");
+        const { writeDockerfile, writeDockerCompose } = await import("@/lib/services/filesystem.service");
+        await writeDockerfile(projectDir, repoName, true);
+        sendLog("✅ Dockerfile regenerated\n");
+
         sendLog("📝 Writing docker-compose.yml...\n");
 
         // Write docker-compose.yml with chosen port and environment variables
-        const { writeDockerCompose } = await import("@/lib/services/filesystem.service");
+        // This will also detect SSG and use the correct port (80 for SSG, 3000 for SSR)
         await writeDockerCompose(
           projectDir,
           data.projectName,

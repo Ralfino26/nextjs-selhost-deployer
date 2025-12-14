@@ -137,6 +137,14 @@ export async function detectStaticExport(repoPath: string): Promise<boolean> {
     // Ignore errors
   }
 
+  // Check if there's an 'out' directory (indicates static export was run)
+  // This is a fallback check - if out directory exists, it's likely SSG
+  const outDir = join(repoPath, "out");
+  if (existsSync(outDir)) {
+    console.log(`[SSG DETECT] Found 'out' directory, likely SSG site`);
+    return true;
+  }
+
   return false;
 }
 
@@ -162,12 +170,16 @@ export async function writeDockerfile(
   // Detect if this is a static export (SSG) project
   const isStaticExport = await detectStaticExport(repoPath);
   console.log(`[DOCKERFILE] Static export detected: ${isStaticExport}`);
+  console.log(`[DOCKERFILE] Repo path: ${repoPath}`);
   
   if (isStaticExport) {
+    console.log(`[DOCKERFILE] Generating SSG Dockerfile (nginx-based)`);
     // Generate SSG Dockerfile (nginx-based)
     await writeStaticDockerfile(repoPath, dockerfilePath);
     return;
   }
+  
+  console.log(`[DOCKERFILE] Generating SSR Dockerfile (Node.js-based)`);
   
   // Detect package manager and lock files
   const bunLockExists = existsSync(join(repoPath, "bun.lock"));
@@ -500,8 +512,11 @@ export async function writeDockerCompose(
   // Check if this is a static export project
   const repoPath = join(projectDir, repoName);
   const isStaticExport = await detectStaticExport(repoPath);
+  console.log(`[DOCKER-COMPOSE] Static export detected: ${isStaticExport}`);
+  console.log(`[DOCKER-COMPOSE] Repo path: ${repoPath}`);
   
   if (isStaticExport) {
+    console.log(`[DOCKER-COMPOSE] Generating SSG docker-compose.yml (nginx on port 80)`);
     // SSG sites use nginx on port 80, no environment variables needed
     const dockerComposeContent = `services:
   ${projectName}:
