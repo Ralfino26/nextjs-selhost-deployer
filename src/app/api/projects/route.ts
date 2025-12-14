@@ -11,7 +11,6 @@ const createProjectSchema = z.object({
   repo: z.string().min(1),
   projectName: z.string().min(1),
   port: z.number().int().positive(),
-  domain: z.string().min(1),
   createDatabase: z.boolean(),
   envVars: z.array(
     z.object({
@@ -191,7 +190,7 @@ export async function POST(request: NextRequest) {
       name: data.projectName,
       repo: data.repo,
       port: data.port,
-      domain: data.domain,
+      domain: "Not configured", // Domain will be configured manually in Nginx Proxy Manager
       createDatabase: data.createDatabase,
       status: "Building",
       directory: projectDir,

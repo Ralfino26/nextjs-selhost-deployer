@@ -37,7 +37,6 @@ export default function NewProjectPage() {
     projectName: "",
     port: "",
     createDatabase: false,
-    domain: "",
   });
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [deployLogs, setDeployLogs] = useState("");
@@ -156,11 +155,7 @@ export default function NewProjectPage() {
         setLoading(false);
       }
     } else if (step === 2) {
-      if (formData.domain) {
-        setStep(3);
-      } else {
-        toast.error("Please enter a domain");
-      }
+      setStep(3);
     }
   };
 
@@ -191,7 +186,6 @@ export default function NewProjectPage() {
           repo: selectedRepo.full_name,
           projectName: formData.projectName,
           port: parseInt(formData.port, 10),
-          domain: formData.domain,
           createDatabase: formData.createDatabase,
           envVars: [], // Environment variables can be added later via the interface
         }),
@@ -462,28 +456,13 @@ export default function NewProjectPage() {
                     }
                   />
                 </div>
-                <div>
-                  <Label htmlFor="domain">Domain</Label>
-                  <Input
-                    id="domain"
-                    className="mt-1"
-                    value={formData.domain}
-                    onChange={(e) =>
-                      setFormData({ ...formData, domain: e.target.value })
-                    }
-                    placeholder="project.byralf.com"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Domain name for this project (will be configured in Nginx Proxy Manager)
-                  </p>
-                </div>
               </div>
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button onClick={handleContinue} disabled={!formData.domain || loading}>
+              <Button onClick={handleContinue} disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -514,10 +493,6 @@ export default function NewProjectPage() {
                 <div className="flex justify-between border-b border-gray-100 pb-2">
                   <span className="text-gray-600">Port:</span>
                   <span className="font-medium">{formData.port}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-100 pb-2">
-                  <span className="text-gray-600">Domain:</span>
-                  <span className="font-medium">{formData.domain}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Database:</span>
@@ -555,7 +530,7 @@ export default function NewProjectPage() {
           }
         }}
         projectName={formData.projectName}
-        projectDomain={formData.domain}
+        projectDomain={undefined}
         deployLogs={deployLogs}
         deployPhases={deployPhases}
         isDeploying={isDeploying}

@@ -8,7 +8,6 @@ const createProjectSchema = z.object({
   repo: z.string().min(1),
   projectName: z.string().min(1),
   port: z.number().int().positive(),
-  domain: z.string().min(1),
   createDatabase: z.boolean(),
   envVars: z.array(
     z.object({
