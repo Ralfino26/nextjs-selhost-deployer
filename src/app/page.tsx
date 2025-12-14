@@ -16,15 +16,18 @@ import {
   Clock,
   XCircle,
   Globe,
-  Settings
+  Settings,
+  RefreshCw
 } from "lucide-react";
 import { Project } from "@/types/project";
+import { toast } from "sonner";
 
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [restarting, setRestarting] = useState<Record<string, "website" | "database" | null>>({});
 
   useEffect(() => {
     fetchProjects();
@@ -99,6 +102,68 @@ export default function Home() {
         return "bg-gray-50 text-gray-700 border-gray-200";
       default:
         return "bg-gray-50 text-gray-500 border-gray-200";
+    }
+  };
+
+  const handleRestartWebsite = async (projectId: string) => {
+    setRestarting((prev) => ({ ...prev, [projectId]: "website" }));
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/restart`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      
+      if (response.ok) {
+        toast.success("Website restarted", {
+          description: "The website has been restarted successfully",
+        });
+        // Refresh projects list
+        await fetchProjects();
+      } else {
+        const error = await response.json();
+        toast.error("Restart failed", {
+          description: error.error || "Failed to restart website",
+        });
+      }
+    } catch (error) {
+      console.error("Error restarting website:", error);
+      toast.error("Restart failed", {
+        description: "Failed to restart website",
+      });
+    } finally {
+      setRestarting((prev) => ({ ...prev, [projectId]: null }));
+    }
+  };
+
+  const handleRestartDatabase = async (projectId: string) => {
+    setRestarting((prev) => ({ ...prev, [projectId]: "database" }));
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/database/restart`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      
+      if (response.ok) {
+        toast.success("Database restarted", {
+          description: "The database has been restarted successfully",
+        });
+        // Refresh projects list
+        await fetchProjects();
+      } else {
+        const error = await response.json();
+        toast.error("Restart failed", {
+          description: error.error || "Failed to restart database",
+        });
+      }
+    } catch (error) {
+      console.error("Error restarting database:", error);
+      toast.error("Restart failed", {
+        description: "Failed to restart database",
+      });
+    } finally {
+      setRestarting((prev) => ({ ...prev, [projectId]: null }));
     }
   };
 
@@ -256,27 +321,61 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                <Link href={`/projects/${project.id}`} className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Settings className="h-4 w-4" />
-                    Manage
-                  </Button>
-                </Link>
-                {project.domain && 
-                 !project.domain.includes("ERROR") && 
-                 project.status === "Running" && (
-                  <a
-                    href={`https://${project.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              {/* Quick Actions */}
+              <div className="pt-4 border-t border-gray-100 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 gap-2"
+                    onClick={() => handleRestartWebsite(project.id)}
+                    disabled={restarting[project.id] === "website" || project.status === "Building"}
                   >
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <ExternalLink className="h-4 w-4" />
+                    {restarting[project.id] === "website" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Restart Website
+                  </Button>
+                  {project.createDatabase && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 gap-2"
+                      onClick={() => handleRestartDatabase(project.id)}
+                      disabled={restarting[project.id] === "database"}
+                    >
+                      {restarting[project.id] === "database" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Database className="h-4 w-4" />
+                      )}
+                      Restart DB
                     </Button>
-                  </a>
-                )}
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href={`/projects/${project.id}`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full gap-2">
+                      <Settings className="h-4 w-4" />
+                      Manage
+                    </Button>
+                  </Link>
+                  {project.domain && 
+                   !project.domain.includes("ERROR") && 
+                   project.status === "Running" && (
+                    <a
+                      href={`https://${project.domain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ))}
