@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { toast } from "sonner";
 
 export default function Home() {
   const pathname = usePathname();
+  const hasFetchedRef = useRef(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,10 +36,28 @@ export default function Home() {
   // Fetch projects when component mounts or pathname changes (handles navigation)
   useEffect(() => {
     if (pathname === "/") {
+      // Always reset and fetch fresh data when on homepage
+      hasFetchedRef.current = false;
+      setProjects([]);
+      setFilteredProjects([]);
       setLoading(true);
       fetchProjects();
     }
   }, [pathname]);
+
+  // Also handle window focus (when user navigates back via browser back button)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (pathname === "/" && (!hasFetchedRef.current || projects.length === 0)) {
+        hasFetchedRef.current = false;
+        setLoading(true);
+        fetchProjects();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [pathname, projects.length]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -59,10 +78,15 @@ export default function Home() {
   const fetchProjects = async () => {
     // Always set loading to true at the start
     setLoading(true);
+    // Clear existing projects immediately to show loading state
+    setProjects([]);
+    setFilteredProjects([]);
+    
     try {
       const auth = sessionStorage.getItem("auth");
       const response = await fetch("/api/projects", {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
+        cache: "no-store", // Ensure fresh data
       });
       
       if (!response.ok) {
@@ -75,6 +99,7 @@ export default function Home() {
       const data = await response.json();
       setProjects(data);
       setFilteredProjects(data);
+      hasFetchedRef.current = true;
     } catch (error: any) {
       // Only log non-network errors (network errors are normal during navigation)
       if (error?.name !== "NetworkError" && error?.message !== "NetworkError when attempting to fetch resource") {
