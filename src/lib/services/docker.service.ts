@@ -68,7 +68,12 @@ export async function deployProject(projectName: string): Promise<void> {
           }
           const match = trimmedLine.match(/^([^:]+):\s*(.+)$/);
           if (match && match[1] !== "NODE_ENV") {
-            envVars.push({ key: match[1].trim(), value: match[2].trim() });
+            const key = match[1].trim();
+            const value = match[2].trim();
+            // Filter out invalid keys that shouldn't be environment variables
+            if (key && !['name', 'external'].includes(key.toLowerCase())) {
+              envVars.push({ key, value });
+            }
           }
         }
       }
@@ -150,7 +155,12 @@ export async function buildProject(projectName: string): Promise<void> {
           }
           const match = trimmedLine.match(/^([^:]+):\s*(.+)$/);
           if (match && match[1] !== "NODE_ENV") {
-            envVars.push({ key: match[1].trim(), value: match[2].trim() });
+            const key = match[1].trim();
+            const value = match[2].trim();
+            // Filter out invalid keys that shouldn't be environment variables
+            if (key && !['name', 'external'].includes(key.toLowerCase())) {
+              envVars.push({ key, value });
+            }
           }
         }
       }

@@ -797,9 +797,16 @@ networks:
   }
   
   // Build environment section for SSR sites
+  // Filter out invalid keys that shouldn't be in environment (like 'name', 'external')
+  const validEnvVars = envVars.filter(v => 
+    v.key && 
+    v.key.trim() !== '' && 
+    !['name', 'external', 'networks', 'volumes', 'restart', 'ports', 'build', 'container_name', 'depends_on'].includes(v.key.trim().toLowerCase())
+  );
+  
   const envSection = [
     "NODE_ENV: production",
-    ...envVars.map((v) => `${v.key}: ${v.value}`),
+    ...validEnvVars.map((v) => `${v.key}: ${v.value}`),
   ].join("\n      ");
   
   // Exact structure from your workflow (SSR)
