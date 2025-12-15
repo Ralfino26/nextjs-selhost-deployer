@@ -57,12 +57,25 @@ export async function GET(
               port = parseInt(ssrPortMatch[1], 10);
             }
             
-            // Extract environment variables
-            const envMatch = existingContent.match(/environment:\s*\n((?:\s+[^\n]+\n?)+)/);
-            if (envMatch) {
-              const envLines = envMatch[1].trim().split("\n");
+            // Extract environment variables (stop at next top-level key like networks:, volumes:, etc.)
+            const envStartMatch = existingContent.match(/environment:\s*\n/);
+            if (envStartMatch) {
+              const envStartIndex = envStartMatch.index! + envStartMatch[0].length;
+              const afterEnv = existingContent.substring(envStartIndex);
+              
+              // Find the next top-level key (starts with 2 spaces or less, followed by a key name)
+              const nextKeyMatch = afterEnv.match(/\n\s{0,2}(networks|volumes|restart|ports|build|container_name|depends_on):/);
+              const envEndIndex = nextKeyMatch ? nextKeyMatch.index! : afterEnv.length;
+              const envSection = afterEnv.substring(0, envEndIndex);
+              
+              const envLines = envSection.split("\n");
               for (const line of envLines) {
-                const match = line.trim().match(/^([^:]+):\s*(.+)$/);
+                const trimmedLine = line.trim();
+                // Skip empty lines and stop if we hit a top-level key
+                if (!trimmedLine || trimmedLine.match(/^(networks|volumes|restart|ports|build|container_name|depends_on):/)) {
+                  break;
+                }
+                const match = trimmedLine.match(/^([^:]+):\s*(.+)$/);
                 if (match && match[1] !== "NODE_ENV") {
                   envVars.push({ key: match[1].trim(), value: match[2].trim() });
                 }
