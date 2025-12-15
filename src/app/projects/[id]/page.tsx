@@ -1176,6 +1176,139 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Website Actions */}
+              <div className="mt-6 rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Website Actions</h3>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      project.status === "Running"
+                        ? "bg-green-100 text-green-800"
+                        : project.status === "Building"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : project.status === "Error"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${
+                      project.status === "Running" ? "bg-green-600" : 
+                      project.status === "Building" ? "bg-yellow-600" : 
+                      project.status === "Error" ? "bg-red-600" : "bg-gray-600"
+                    }`}></span>
+                    {project.status}
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {/* Git Pull */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Klaar met development?
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Pull de laatste wijzigingen van GitHub
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleUpdate}
+                      disabled={actionLoading !== null}
+                      className={`min-w-[120px] ${
+                        gitStatus?.isBehind
+                          ? "animate-pulse border-orange-500 bg-orange-50 hover:bg-orange-100"
+                          : ""
+                      }`}
+                    >
+                      {actionLoading === "update" ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">
+                            {gitStatus?.isBehind ? "⚠️" : "📥"}
+                          </span>
+                          Git pull
+                          {gitStatus?.isBehind && gitStatus.commitsBehind > 0 && (
+                            <span className="ml-2 text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">
+                              {gitStatus.commitsBehind}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="border-t border-blue-200"></div>
+
+                  {/* Build */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Build Images
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Build nieuwe Docker images
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        handleBuild();
+                      }}
+                      disabled={actionLoading !== null}
+                      className="min-w-[140px] bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      {actionLoading === "build" ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Building...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">🔨</span>
+                          Build
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="border-t border-blue-200"></div>
+
+                  {/* Deploy */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Deploy
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Stop containers en start opnieuw
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        handleDeploy();
+                      }}
+                      disabled={actionLoading !== null}
+                      className="min-w-[140px] bg-blue-600 hover:bg-blue-700"
+                    >
+                      {actionLoading === "deploy" ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Deploying...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">🚀</span>
+                          Deploy
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
         )}
