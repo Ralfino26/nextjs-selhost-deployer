@@ -839,6 +839,125 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleCreateDatabase = async () => {
+    setActionLoading("create-database");
+    setShowDeployLogs(true);
+    setDeployLogs("");
+    // Reset phases for database creation
+    setDeployPhases({
+      initializing: "active",
+      building: "pending",
+      deploying: "pending",
+      cleanup: "pending",
+      postProcessing: "pending",
+    });
+    
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/database/create/stream`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start database creation");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let databaseComplete = false;
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.log) {
+                const logText = data.log;
+                setDeployLogs((prev) => prev + logText);
+                
+                // Detect phase transitions
+                if (logText.includes("🗄️  Setting up database") || logText.includes("Setting up database")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    initializing: "active",
+                  }));
+                } else if (logText.includes("✅ Database compose file created")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    initializing: "complete",
+                    building: "active",
+                  }));
+                } else if (logText.includes("🚀 Starting database container") || logText.includes("Starting database container")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    building: "active",
+                  }));
+                } else if (logText.includes("✅ Database started successfully")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    building: "complete",
+                    deploying: "complete",
+                    cleanup: "complete",
+                    postProcessing: "complete",
+                  }));
+                } else if (logText === "DONE") {
+                  databaseComplete = true;
+                  setActionLoading(null);
+                  toast.success("Database created", {
+                    description: `Database for ${project?.name} has been created successfully`,
+                  });
+                  await fetchProject();
+                  if (!isDeployModalMinimized) {
+                    setTimeout(() => {
+                      setShowDeployLogs(false);
+                    }, 2000);
+                  }
+                  return;
+                }
+                
+                // Auto-scroll to bottom
+                setTimeout(() => {
+                  const logElement = document.getElementById("deploy-logs");
+                  if (logElement) {
+                    logElement.scrollTop = logElement.scrollHeight;
+                  }
+                }, 100);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      if (!databaseComplete) {
+        setActionLoading(null);
+        setDeployLogs((prev) => prev + "\n\n⚠️ Database creation stream ended unexpectedly\n");
+      }
+    } catch (error: any) {
+      console.error("Error creating database:", error);
+      setDeployLogs((prev) => prev + `\n\n❌ Error: ${error.message}\n`);
+      toast.error("Database creation failed", {
+        description: error.message || "Failed to create database",
+      });
+      setActionLoading(null);
+    }
+  };
+
   const handleRestartDatabase = async () => {
     if (!project?.database) {
       toast.error("No database found", {
@@ -1791,39 +1910,76 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 <div className="space-y-4">
-                  {/* Backup Database */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700 mb-1">
-                        Backup Database
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Maak een backup van de database
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleBackup}
-                      disabled={actionLoading !== null}
-                      className="min-w-[120px] border-green-300 hover:bg-green-50"
-                    >
-                      {actionLoading === "backup" ? (
-                        <>
-                          <span className="mr-2">⏳</span>
-                          Backing up...
-                        </>
-                      ) : (
-                        <>
-                          <span className="mr-2">💾</span>
-                          Backup
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  {/* Create Database - Only show if database doesn't exist */}
+                  {!project.database && (
+                    <>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-700 mb-1">
+                            Create Database
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Voeg een MongoDB database toe aan dit project
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleCreateDatabase}
+                          disabled={actionLoading !== null}
+                          className="min-w-[140px] bg-green-600 hover:bg-green-700"
+                        >
+                          {actionLoading === "create-database" ? (
+                            <>
+                              <span className="mr-2">⏳</span>
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <span className="mr-2">➕</span>
+                              Create Database
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {project.database && <div className="border-t border-green-200"></div>}
+                    </>
+                  )}
+                  {/* Backup Database - Only show if database exists */}
+                  {project.database && (
+                    <>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-700 mb-1">
+                            Backup Database
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Maak een backup van de database
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={handleBackup}
+                          disabled={actionLoading !== null}
+                          className="min-w-[120px] border-green-300 hover:bg-green-50"
+                        >
+                          {actionLoading === "backup" ? (
+                            <>
+                              <span className="mr-2">⏳</span>
+                              Backing up...
+                            </>
+                          ) : (
+                            <>
+                              <span className="mr-2">💾</span>
+                              Backup
+                            </>
+                          )}
+                        </Button>
+                      </div>
 
-                  <div className="border-t border-green-200"></div>
-
-                  {/* Restart Database */}
+                      <div className="border-t border-green-200"></div>
+                    </>
+                  )}
+                  {/* Restart Database - Only show if database exists */}
+                  {project.database && (
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700 mb-1">
@@ -1852,6 +2008,7 @@ export default function ProjectDetailPage() {
                       )}
                     </Button>
                   </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1889,7 +2046,7 @@ export default function ProjectDetailPage() {
         projectDomain={project?.domain}
         deployLogs={deployLogs}
         deployPhases={deployPhases}
-        isDeploying={actionLoading === "deploy" || actionLoading === "build"}
+        isDeploying={actionLoading === "deploy" || actionLoading === "build" || actionLoading === "create-database"}
       />
 
 
