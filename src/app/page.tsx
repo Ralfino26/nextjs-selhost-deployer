@@ -270,21 +270,52 @@ export default function Home() {
                     {project.repo}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 ml-2">
-                  {getStatusIcon(project.status)}
-                </div>
               </div>
 
-              {/* Status Badge */}
-              <div className="mb-4">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${getStatusColor(
-                    project.status
-                  )}`}
-                >
-                  {getStatusIcon(project.status)}
-                  {project.status}
-                </span>
+              {/* Status Badges */}
+              <div className="mb-4 space-y-2">
+                {/* Website Status */}
+                {project.repo !== "Database Only" && project.websiteStatus && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-600 w-20">Website:</span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusColor(
+                        project.websiteStatus
+                      )}`}
+                    >
+                      {getStatusIcon(project.websiteStatus)}
+                      {project.websiteStatus}
+                    </span>
+                  </div>
+                )}
+                {/* Database Status */}
+                {project.createDatabase && project.databaseStatus && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-600 w-20">Database:</span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusColor(
+                        project.databaseStatus
+                      )}`}
+                    >
+                      {getStatusIcon(project.databaseStatus)}
+                      {project.databaseStatus}
+                    </span>
+                  </div>
+                )}
+                {/* Fallback for database-only projects without databaseStatus */}
+                {project.repo === "Database Only" && !project.databaseStatus && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-600 w-20">Database:</span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusColor(
+                        project.status
+                      )}`}
+                    >
+                      {getStatusIcon(project.status)}
+                      {project.status}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Info Grid */}

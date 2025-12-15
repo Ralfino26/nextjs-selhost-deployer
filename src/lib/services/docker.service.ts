@@ -498,11 +498,31 @@ export async function getLogs(
   }
 }
 
-// Get project status
+// Get project status (website container)
 export async function getProjectStatus(projectName: string): Promise<"Running" | "Stopped" | "Error"> {
   try {
     const docker = await getDocker();
     const container = docker.getContainer(projectName);
+    const info = await container.inspect();
+    
+    if (info.State.Running) {
+      return "Running";
+    } else if (info.State.Status === "exited") {
+      return "Stopped";
+    } else {
+      return "Error";
+    }
+  } catch {
+    return "Stopped";
+  }
+}
+
+// Get database status
+export async function getDatabaseStatus(projectName: string): Promise<"Running" | "Stopped" | "Error"> {
+  try {
+    const docker = await getDocker();
+    const dbContainerName = `${projectName}-mongo`;
+    const container = docker.getContainer(dbContainerName);
     const info = await container.inspect();
     
     if (info.State.Running) {

@@ -5,7 +5,9 @@ export interface Project {
   port: number;
   domain: string;
   createDatabase: boolean;
-  status: "Running" | "Stopped" | "Building" | "Error";
+  status: "Running" | "Stopped" | "Building" | "Error"; // Website status (deprecated, use websiteStatus)
+  websiteStatus?: "Running" | "Stopped" | "Building" | "Error"; // Website container status
+  databaseStatus?: "Running" | "Stopped" | "Error"; // Database container status
   lastDeployment?: string;
   directory: string;
   gitBehind?: boolean; // True if project is behind the remote repository

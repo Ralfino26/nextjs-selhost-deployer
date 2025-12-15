@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { config } from "@/lib/config";
-import { getProjectStatus } from "@/lib/services/docker.service";
+import { getProjectStatus, getDatabaseStatus } from "@/lib/services/docker.service";
 import { Project } from "@/types/project";
 import { deployProject, startDatabase } from "@/lib/services/docker.service";
 import { z } from "zod";
@@ -39,6 +39,8 @@ export async function GET() {
         port: number;
         hasDatabase: boolean;
         status: "Running" | "Stopped" | "Error";
+        websiteStatus?: "Running" | "Stopped" | "Error";
+        databaseStatus?: "Running" | "Stopped" | "Error";
         directory: string;
       }> = [];
 
@@ -69,13 +71,14 @@ export async function GET() {
 
           // For database-only projects, skip docker-compose.yml check
           if (isDatabaseOnly) {
-            const status = await getProjectStatus(dir.name);
+            const databaseStatus = await getDatabaseStatus(dir.name);
             projectData.push({
               name: dir.name,
               repo: "Database Only",
               port: 0,
               hasDatabase: true,
-              status,
+              status: databaseStatus, // Use database status for database-only projects
+              databaseStatus,
               directory: join(baseDir, dir.name),
             });
             continue;
@@ -91,14 +94,17 @@ export async function GET() {
           const portMatch = content.match(/ports:\s*-\s*"(\d+):/);
           const port = portMatch ? parseInt(portMatch[1], 10) : 0;
           
-          const status = await getProjectStatus(dir.name);
+          const websiteStatus = await getProjectStatus(dir.name);
+          const databaseStatus = hasDatabase ? await getDatabaseStatus(dir.name) : undefined;
 
           projectData.push({
             name: dir.name,
             repo: repoDir.name,
             port,
             hasDatabase,
-            status,
+            status: websiteStatus, // Keep for backwards compatibility
+            websiteStatus,
+            databaseStatus,
             directory: join(baseDir, dir.name),
           });
         } catch {
@@ -115,13 +121,14 @@ export async function GET() {
           
           // If it's database-only, include it even without docker-compose.yml
           if (hasDatabase && !hasRepo) {
-            const status = await getProjectStatus(dir.name);
+            const databaseStatus = await getDatabaseStatus(dir.name);
             projectData.push({
               name: dir.name,
               repo: "Database Only",
               port: 0,
               hasDatabase: true,
-              status,
+              status: databaseStatus, // Use database status for database-only projects
+              databaseStatus,
               directory: join(baseDir, dir.name),
             });
           }
@@ -231,6 +238,8 @@ export async function GET() {
           domain: domains[i] || "ERROR: Domain not found in Nginx Proxy Manager",
           createDatabase: projectData[i].hasDatabase,
           status: projectData[i].status,
+          websiteStatus: projectData[i].websiteStatus,
+          databaseStatus: projectData[i].databaseStatus,
           directory: projectData[i].directory,
           gitBehind: gitStatuses[i]?.isBehind || false,
         });
