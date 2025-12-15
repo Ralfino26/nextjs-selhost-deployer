@@ -882,460 +882,508 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Service Cards Grid */}
-      <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Project Info Card */}
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
-              <span className="text-lg">📦</span>
-            </div>
-            <h2 className="text-base font-semibold text-gray-900">Project Information</h2>
-          </div>
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="font-medium text-gray-600">Name:</span>
-              <p className="mt-0.5 text-gray-900">{project.name}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-600">Status:</span>
-              <div className="mt-0.5">
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                    project.status === "Running"
-                      ? "bg-green-100 text-green-800"
-                      : project.status === "Building"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : project.status === "Error"
-                      ? "bg-red-100 text-red-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {project.status}
-                </span>
-              </div>
-            </div>
-            {project.repo !== "Database Only" && (
-              <>
-                <div>
-                  <span className="font-medium text-gray-600">Port:</span>
-                  <p className="mt-0.5 font-mono text-gray-900">{project.port}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Domain:</span>
-                  <p className="mt-0.5">
-                    {project.domain.startsWith("ERROR") || project.domain === "N/A" ? (
-                      <span className="text-red-600">{project.domain}</span>
+      {/* Main Tabs */}
+      <Tabs defaultValue={project.repo !== "Database Only" ? "website" : project.database ? "database" : "project"} className="w-full mb-6">
+        <TabsList className={`grid w-full max-w-2xl ${
+          project.repo !== "Database Only" && project.database 
+            ? "grid-cols-3" 
+            : (project.repo !== "Database Only" || project.database) 
+            ? "grid-cols-2" 
+            : "grid-cols-1"
+        }`}>
+          {project.repo !== "Database Only" && (
+            <TabsTrigger value="website" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              🌐 Website
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="project" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">
+            📦 Project
+          </TabsTrigger>
+          {project.database && (
+            <TabsTrigger value="database" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
+              🍃 Database
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        {/* Website Info Tab - Blue Theme */}
+        {project.repo !== "Database Only" && (
+          <TabsContent value="website" className="mt-6">
+            <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-lg">
+              <div className="mb-6 grid gap-6 md:grid-cols-2">
+                {/* Git Information */}
+                <div className="rounded-lg border-2 border-gray-800 bg-gray-900 p-5 shadow-lg">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+                      <span className="text-lg">🐙</span>
+                    </div>
+                    <h2 className="text-base font-semibold text-white">Git Repository</h2>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    {project.gitRemote ? (
+                      <>
+                        <div className="rounded-md bg-gray-800 p-2">
+                          <span className="text-xs font-medium text-gray-400">Remote</span>
+                          <p className="mt-1 break-all font-mono text-xs text-gray-200">
+                            {project.gitRemote.replace(/https?:\/\/[^@]+@/, "https://***@")}
+                          </p>
+                        </div>
+                        {project.gitBranch && (
+                          <div className="rounded-md bg-gray-800 p-2">
+                            <span className="text-xs font-medium text-gray-400">Branch</span>
+                            <p className="mt-1 font-mono text-sm text-white">{project.gitBranch}</p>
+                          </div>
+                        )}
+                        {project.gitCommit && (
+                          <div className="rounded-md bg-gray-800 p-2">
+                            <span className="text-xs font-medium text-gray-400">Commit</span>
+                            <p className="mt-1 font-mono text-xs text-gray-200">{project.gitCommit}</p>
+                          </div>
+                        )}
+                        {project.gitCommitMessage && (
+                          <div className="rounded-md bg-gray-800 p-2">
+                            <span className="text-xs font-medium text-gray-400">Message</span>
+                            <p className="mt-1 text-xs text-gray-200">{project.gitCommitMessage}</p>
+                          </div>
+                        )}
+                        {project.gitCommitAuthor && (
+                          <div className="rounded-md bg-gray-800 p-2">
+                            <span className="text-xs font-medium text-gray-400">Author</span>
+                            <p className="mt-1 text-xs text-gray-200">{project.gitCommitAuthor}</p>
+                          </div>
+                        )}
+                        {project.gitCommitDate && (
+                          <div className="rounded-md bg-gray-800 p-2">
+                            <span className="text-xs font-medium text-gray-400">Date</span>
+                            <p className="mt-1 text-xs text-gray-200">{project.gitCommitDate}</p>
+                          </div>
+                        )}
+                      </>
                     ) : (
-                      <a
-                        href={`https://${project.domain}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {project.domain}
-                      </a>
+                      <p className="text-gray-400">No git information available</p>
                     )}
-                  </p>
+                  </div>
                 </div>
-              </>
-            )}
-            {project.createDatabase && (
-              <div>
-                <span className="font-medium text-gray-600">Database:</span>
-                <p className="mt-0.5 text-green-600">✓ Enabled</p>
-              </div>
-            )}
-            {project.lastDeployment && (
-              <div>
-                <span className="font-medium text-gray-600">Last Deployment:</span>
-                <p className="mt-0.5 text-xs text-gray-900">{project.lastDeployment}</p>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Git Information Card - GitHub Theme */}
-        <div className="rounded-lg border-2 border-gray-800 bg-gray-900 p-5 shadow-lg">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
-              <span className="text-lg">🐙</span>
-            </div>
-            <h2 className="text-base font-semibold text-white">Git Repository</h2>
-          </div>
-          <div className="space-y-3 text-sm">
-            {project.gitRemote ? (
-              <>
-                <div className="rounded-md bg-gray-800 p-2">
-                  <span className="text-xs font-medium text-gray-400">Remote</span>
-                  <p className="mt-1 break-all font-mono text-xs text-gray-200">
-                    {project.gitRemote.replace(/https?:\/\/[^@]+@/, "https://***@")}
-                  </p>
+                {/* Docker Container */}
+                <div className="rounded-lg border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-white p-5 shadow-lg">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
+                      <span className="text-lg">🐳</span>
+                    </div>
+                    <h2 className="text-base font-semibold text-gray-900">Docker Container</h2>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {project.containerId ? (
+                      <>
+                        <div>
+                          <span className="font-medium text-gray-600">Container ID:</span>
+                          <p className="mt-0.5 font-mono text-xs text-gray-900">{project.containerId}</p>
+                        </div>
+                        {project.containerImage && (
+                          <div>
+                            <span className="font-medium text-gray-600">Image:</span>
+                            <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
+                              {project.containerImage}
+                            </p>
+                          </div>
+                        )}
+                        {project.containerCreated && (
+                          <div>
+                            <span className="font-medium text-gray-600">Created:</span>
+                            <p className="mt-0.5 text-xs text-gray-900">{project.containerCreated}</p>
+                          </div>
+                        )}
+                        {project.containerNetworks && project.containerNetworks.length > 0 && (
+                          <div>
+                            <span className="font-medium text-gray-600">Networks:</span>
+                            <div className="mt-0.5 flex flex-wrap gap-1">
+                              {project.containerNetworks.map((network) => (
+                                <span
+                                  key={network}
+                                  className="rounded bg-blue-100 px-2 py-1 text-xs font-mono text-blue-800"
+                                >
+                                  {network}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {project.containerHealth && project.containerHealth !== "none" && (
+                          <div>
+                            <span className="font-medium text-gray-600">Health:</span>
+                            <div className="mt-0.5">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                  project.containerHealth === "healthy"
+                                    ? "bg-green-100 text-green-800"
+                                    : project.containerHealth === "starting"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {project.containerHealth}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {project.containerMetrics && (
+                          <>
+                            {project.containerMetrics.cpuUsage !== undefined && (
+                              <div className="rounded-md bg-blue-50 p-2">
+                                <div className="mb-1 flex items-center justify-between">
+                                  <span className="text-xs font-medium text-gray-700">CPU Usage</span>
+                                  <span className="text-xs font-semibold text-blue-700">
+                                    {project.containerMetrics.cpuUsage.toFixed(2)}%
+                                  </span>
+                                </div>
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                                  <div
+                                    className="h-full bg-blue-500 transition-all"
+                                    style={{ width: `${Math.min(project.containerMetrics.cpuUsage, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {project.containerMetrics.memoryUsage !== undefined && (
+                              <div className="rounded-md bg-blue-50 p-2">
+                                <div className="mb-1 flex items-center justify-between">
+                                  <span className="text-xs font-medium text-gray-700">Memory</span>
+                                  <span className="text-xs font-semibold text-blue-700">
+                                    {project.containerMetrics.memoryLimit
+                                      ? `${((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100).toFixed(1)}%`
+                                      : "N/A"}
+                                  </span>
+                                </div>
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                                  <div
+                                    className="h-full bg-blue-500 transition-all"
+                                    style={{
+                                      width: project.containerMetrics.memoryLimit
+                                        ? `${Math.min((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100, 100)}%`
+                                        : "0%",
+                                    }}
+                                  />
+                                </div>
+                                <p className="mt-1 text-xs text-gray-600">
+                                  {project.containerMetrics.memoryLimit
+                                    ? `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB / ${(project.containerMetrics.memoryLimit / 1024 / 1024).toFixed(2)} MB`
+                                    : `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB`}
+                                </p>
+                              </div>
+                            )}
+                            {project.containerMetrics.uptime !== undefined && (
+                              <div>
+                                <span className="font-medium text-gray-600">Uptime:</span>
+                                <p className="mt-0.5 text-xs text-gray-900">
+                                  {project.containerMetrics.uptime >= 86400
+                                    ? `${Math.floor(project.containerMetrics.uptime / 86400)}d ${Math.floor((project.containerMetrics.uptime % 86400) / 3600)}h`
+                                    : project.containerMetrics.uptime >= 3600
+                                    ? `${Math.floor(project.containerMetrics.uptime / 3600)}h ${Math.floor((project.containerMetrics.uptime % 3600) / 60)}m`
+                                    : `${Math.floor(project.containerMetrics.uptime / 60)}m ${project.containerMetrics.uptime % 60}s`}
+                                </p>
+                              </div>
+                            )}
+                            {project.containerMetrics.restartCount !== undefined && (
+                              <div>
+                                <span className="font-medium text-gray-600">Restart Count:</span>
+                                <p className="mt-0.5 text-xs text-gray-900">
+                                  {project.containerMetrics.restartCount}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {project.volumeMounts && project.volumeMounts.length > 0 && (
+                          <div>
+                            <span className="font-medium text-gray-600">Volume Mounts:</span>
+                            <div className="mt-0.5 space-y-1">
+                              {project.volumeMounts.map((mount, index) => (
+                                <div key={index} className="text-xs">
+                                  <p className="font-mono text-gray-900 break-all">
+                                    {mount.source} → {mount.destination}
+                                  </p>
+                                  <p className="text-gray-500 text-[10px]">({mount.type})</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-500">Container not found or not running</p>
+                    )}
+                  </div>
                 </div>
-                {project.gitBranch && (
-                  <div className="rounded-md bg-gray-800 p-2">
-                    <span className="text-xs font-medium text-gray-400">Branch</span>
-                    <p className="mt-1 font-mono text-sm text-white">{project.gitBranch}</p>
-                  </div>
-                )}
-                {project.gitCommit && (
-                  <div className="rounded-md bg-gray-800 p-2">
-                    <span className="text-xs font-medium text-gray-400">Commit</span>
-                    <p className="mt-1 font-mono text-xs text-gray-200">{project.gitCommit}</p>
-                  </div>
-                )}
-                {project.gitCommitMessage && (
-                  <div className="rounded-md bg-gray-800 p-2">
-                    <span className="text-xs font-medium text-gray-400">Message</span>
-                    <p className="mt-1 text-xs text-gray-200">{project.gitCommitMessage}</p>
-                  </div>
-                )}
-                {project.gitCommitAuthor && (
-                  <div className="rounded-md bg-gray-800 p-2">
-                    <span className="text-xs font-medium text-gray-400">Author</span>
-                    <p className="mt-1 text-xs text-gray-200">{project.gitCommitAuthor}</p>
-                  </div>
-                )}
-                {project.gitCommitDate && (
-                  <div className="rounded-md bg-gray-800 p-2">
-                    <span className="text-xs font-medium text-gray-400">Date</span>
-                    <p className="mt-1 text-xs text-gray-200">{project.gitCommitDate}</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-gray-400">No git information available</p>
-            )}
-          </div>
-        </div>
+              </div>
 
-        {/* Docker Container Card - Docker Theme */}
-        <div className="rounded-lg border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-white p-5 shadow-lg">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
-              <span className="text-lg">🐳</span>
-            </div>
-            <h2 className="text-base font-semibold text-gray-900">Docker Container</h2>
-          </div>
-          <div className="space-y-2 text-sm">
-            {project.containerId ? (
-              <>
-                <div>
-                  <span className="font-medium text-gray-600">Container ID:</span>
-                  <p className="mt-0.5 font-mono text-xs text-gray-900">{project.containerId}</p>
-                </div>
-                {project.containerImage && (
+              {/* Website Details */}
+              <div className="mt-6 rounded-lg border border-blue-200 bg-white p-5">
+                <h3 className="mb-4 text-lg font-semibold text-gray-900">Website Details</h3>
+                <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <span className="font-medium text-gray-600">Image:</span>
-                    <p className="mt-0.5 break-all font-mono text-xs text-gray-900">
-                      {project.containerImage}
+                    <span className="font-medium text-gray-600">Port:</span>
+                    <p className="mt-0.5 font-mono text-gray-900">{project.port}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600">Domain:</span>
+                    <p className="mt-0.5">
+                      {project.domain.startsWith("ERROR") || project.domain === "N/A" ? (
+                        <span className="text-red-600">{project.domain}</span>
+                      ) : (
+                        <a
+                          href={`https://${project.domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {project.domain}
+                        </a>
+                      )}
                     </p>
                   </div>
-                )}
-                {project.containerCreated && (
-                  <div>
-                    <span className="font-medium text-gray-600">Created:</span>
-                    <p className="mt-0.5 text-xs text-gray-900">{project.containerCreated}</p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        )}
+
+        {/* Project Info Tab - Gray Theme */}
+        <TabsContent value="project" className="mt-6">
+          <div className="rounded-lg border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-6 shadow-lg">
+            <div className="mb-6 grid gap-6 md:grid-cols-2">
+              {/* Project Information */}
+              <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+                    <span className="text-lg">📦</span>
                   </div>
-                )}
-                {project.containerNetworks && project.containerNetworks.length > 0 && (
+                  <h2 className="text-base font-semibold text-gray-900">Project Information</h2>
+                </div>
+                <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium text-gray-600">Networks:</span>
-                    <div className="mt-0.5 flex flex-wrap gap-1">
-                      {project.containerNetworks.map((network) => (
-                        <span
-                          key={network}
-                          className="rounded bg-blue-100 px-2 py-1 text-xs font-mono text-blue-800"
-                        >
-                          {network}
-                        </span>
-                      ))}
-                    </div>
+                    <span className="font-medium text-gray-600">Name:</span>
+                    <p className="mt-0.5 text-gray-900">{project.name}</p>
                   </div>
-                )}
-                {project.containerHealth && project.containerHealth !== "none" && (
                   <div>
-                    <span className="font-medium text-gray-600">Health:</span>
+                    <span className="font-medium text-gray-600">Status:</span>
                     <div className="mt-0.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          project.containerHealth === "healthy"
+                          project.status === "Running"
                             ? "bg-green-100 text-green-800"
-                            : project.containerHealth === "starting"
+                            : project.status === "Building"
                             ? "bg-yellow-100 text-yellow-800"
-                            : "bg-red-100 text-red-800"
+                            : project.status === "Error"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        {project.containerHealth}
+                        {project.status}
                       </span>
                     </div>
                   </div>
-                )}
-                {project.containerMetrics && (
-                  <>
-                    {project.containerMetrics.cpuUsage !== undefined && (
-                      <div className="rounded-md bg-blue-50 p-2">
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-700">CPU Usage</span>
-                          <span className="text-xs font-semibold text-blue-700">
-                            {project.containerMetrics.cpuUsage.toFixed(2)}%
-                          </span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
-                          <div
-                            className="h-full bg-blue-500 transition-all"
-                            style={{ width: `${Math.min(project.containerMetrics.cpuUsage, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {project.containerMetrics.memoryUsage !== undefined && (
-                      <div className="rounded-md bg-blue-50 p-2">
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-700">Memory</span>
-                          <span className="text-xs font-semibold text-blue-700">
-                            {project.containerMetrics.memoryLimit
-                              ? `${((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100).toFixed(1)}%`
-                              : "N/A"}
-                          </span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
-                          <div
-                            className="h-full bg-blue-500 transition-all"
-                            style={{
-                              width: project.containerMetrics.memoryLimit
-                                ? `${Math.min((project.containerMetrics.memoryUsage / project.containerMetrics.memoryLimit) * 100, 100)}%`
-                                : "0%",
-                            }}
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-gray-600">
-                          {project.containerMetrics.memoryLimit
-                            ? `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB / ${(project.containerMetrics.memoryLimit / 1024 / 1024).toFixed(2)} MB`
-                            : `${(project.containerMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB`}
-                        </p>
-                      </div>
-                    )}
-                    {project.containerMetrics.uptime !== undefined && (
-                      <div>
-                        <span className="font-medium text-gray-600">Uptime:</span>
-                        <p className="mt-0.5 text-xs text-gray-900">
-                          {project.containerMetrics.uptime >= 86400
-                            ? `${Math.floor(project.containerMetrics.uptime / 86400)}d ${Math.floor((project.containerMetrics.uptime % 86400) / 3600)}h`
-                            : project.containerMetrics.uptime >= 3600
-                            ? `${Math.floor(project.containerMetrics.uptime / 3600)}h ${Math.floor((project.containerMetrics.uptime % 3600) / 60)}m`
-                            : `${Math.floor(project.containerMetrics.uptime / 60)}m ${project.containerMetrics.uptime % 60}s`}
-                        </p>
-                      </div>
-                    )}
-                    {project.containerMetrics.restartCount !== undefined && (
-                      <div>
-                        <span className="font-medium text-gray-600">Restart Count:</span>
-                        <p className="mt-0.5 text-xs text-gray-900">
-                          {project.containerMetrics.restartCount}
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-                {project.volumeMounts && project.volumeMounts.length > 0 && (
-                  <div>
-                    <span className="font-medium text-gray-600">Volume Mounts:</span>
-                    <div className="mt-0.5 space-y-1">
-                      {project.volumeMounts.map((mount, index) => (
-                        <div key={index} className="text-xs">
-                          <p className="font-mono text-gray-900 break-all">
-                            {mount.source} → {mount.destination}
-                          </p>
-                          <p className="text-gray-500 text-[10px]">({mount.type})</p>
-                        </div>
-                      ))}
+                  {project.createDatabase && (
+                    <div>
+                      <span className="font-medium text-gray-600">Database:</span>
+                      <p className="mt-0.5 text-green-600">✓ Enabled</p>
                     </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-gray-500">Container not found or not running</p>
-            )}
-          </div>
-        </div>
-
-        {/* Database Information Card - MongoDB Theme */}
-        {project.database && (
-          <div className="rounded-lg border-2 border-green-600 bg-gradient-to-br from-green-50 to-white p-5 shadow-lg">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-600">
-                <span className="text-lg">🍃</span>
+                  )}
+                  {project.lastDeployment && (
+                    <div>
+                      <span className="font-medium text-gray-600">Last Deployment:</span>
+                      <p className="mt-0.5 text-xs text-gray-900">{project.lastDeployment}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h2 className="text-base font-semibold text-gray-900">MongoDB Database</h2>
-            </div>
-            <div className="space-y-3 text-sm">
-              {project.database.containerStatus && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Status</span>
-                  <div className="mt-1">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        project.database.containerStatus === "Running"
-                          ? "bg-green-600 text-white"
-                          : project.database.containerStatus === "Stopped"
-                          ? "bg-gray-400 text-white"
-                          : "bg-red-500 text-white"
-                      }`}
-                    >
-                      {project.database.containerStatus}
-                    </span>
+
+              {/* Project Paths */}
+              <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+                    <span className="text-lg">📁</span>
                   </div>
+                  <h2 className="text-base font-semibold text-gray-900">Paths</h2>
                 </div>
-              )}
-              {project.database.containerId && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Container ID</span>
-                  <p className="mt-1 font-mono text-xs text-gray-800">
-                    {project.database.containerId}
-                  </p>
-                </div>
-              )}
-              {project.database.containerImage && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Image</span>
-                  <p className="mt-1 break-all font-mono text-xs text-gray-800">
-                    {project.database.containerImage}
-                  </p>
-                </div>
-              )}
-              {project.database.databaseName && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Database Name</span>
-                  <p className="mt-1 font-mono text-sm font-semibold text-green-700">
-                    {project.database.databaseName}
-                  </p>
-                </div>
-              )}
-              {project.database.port && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Port</span>
-                  <p className="mt-1 font-mono text-sm text-gray-800">
-                    {project.database.port}
-                  </p>
-                </div>
-              )}
-              {project.database.username && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Username</span>
-                  <p className="mt-1 font-mono text-xs text-gray-800">
-                    {project.database.username}
-                  </p>
-                </div>
-              )}
-              {project.database.connectionString && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Connection String</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <p 
-                      className="flex-1 break-all font-mono text-xs text-gray-800 cursor-text select-all"
-                      onClick={(e) => {
-                        const text = e.currentTarget.textContent;
-                        if (text) {
-                          const selection = window.getSelection();
-                          const range = document.createRange();
-                          range.selectNodeContents(e.currentTarget);
-                          selection?.removeAllRanges();
-                          selection?.addRange(range);
-                        }
-                      }}
-                    >
-                      {project.database.connectionString}
+                <div className="space-y-2 text-sm">
+                  {project.repoPath && (
+                    <div className="rounded-md bg-gray-50 p-2">
+                      <span className="text-xs font-medium text-gray-600">Repository</span>
+                      <p className="mt-1 break-all font-mono text-xs text-gray-800">
+                        {project.repoPath}
+                      </p>
+                    </div>
+                  )}
+                  {project.dockerComposePath && (
+                    <div className="rounded-md bg-gray-50 p-2">
+                      <span className="text-xs font-medium text-gray-600">Docker Compose</span>
+                      <p className="mt-1 break-all font-mono text-xs text-gray-800">
+                        {project.dockerComposePath}
+                      </p>
+                    </div>
+                  )}
+                  <div className="rounded-md bg-gray-50 p-2">
+                    <span className="text-xs font-medium text-gray-600">Project Directory</span>
+                    <p className="mt-1 break-all font-mono text-xs text-gray-800">
+                      {project.directory}
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        const connectionString = project.database!.connectionString!;
-                        try {
-                          // Try modern clipboard API first
-                          if (navigator.clipboard && navigator.clipboard.writeText) {
-                            await navigator.clipboard.writeText(connectionString);
-                            toast.success("Connection string copied to clipboard");
-                            return;
-                          }
-                          
-                          // Fallback: use execCommand
-                          const textArea = document.createElement("textarea");
-                          textArea.value = connectionString;
-                          textArea.style.position = "fixed";
-                          textArea.style.left = "-999999px";
-                          document.body.appendChild(textArea);
-                          textArea.focus();
-                          textArea.select();
-                          
-                          const successful = document.execCommand("copy");
-                          document.body.removeChild(textArea);
-                          
-                          if (successful) {
-                            toast.success("Connection string copied to clipboard");
-                          } else {
-                            throw new Error("execCommand failed");
-                          }
-                        } catch (error) {
-                          toast.error("Failed to copy", {
-                            description: "Please select and copy manually",
-                          });
-                        }
-                      }}
-                      className="h-7 border-green-300 bg-white text-xs text-green-700 hover:bg-green-50 flex-shrink-0"
-                    >
-                      Copy
-                    </Button>
                   </div>
                 </div>
-              )}
-              {project.database.volumePath && (
-                <div className="rounded-md bg-green-50 p-2">
-                  <span className="text-xs font-medium text-gray-700">Volume Path</span>
-                  <p className="mt-1 break-all font-mono text-xs text-gray-800">
-                    {project.database.volumePath}
-                  </p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        )}
+        </TabsContent>
 
-        {/* File Paths Card */}
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
-              <span className="text-lg">📁</span>
-            </div>
-            <h2 className="text-base font-semibold text-gray-900">File Paths</h2>
-          </div>
-          <div className="space-y-3 text-sm">
-            {project.repoPath && (
-              <div className="rounded-md bg-gray-50 p-2">
-                <span className="text-xs font-medium text-gray-600">Repository</span>
-                <p className="mt-1 break-all font-mono text-xs text-gray-800">
-                  {project.repoPath}
-                </p>
+        {/* Database Info Tab - Green Theme */}
+        {project.database && (
+          <TabsContent value="database" className="mt-6">
+            <div className="rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-6 shadow-lg">
+              <div className="mb-6 grid gap-6 md:grid-cols-2">
+                {/* Database Information */}
+                <div className="rounded-lg border-2 border-green-600 bg-gradient-to-br from-green-50 to-white p-5 shadow-lg">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-600">
+                      <span className="text-lg">🍃</span>
+                    </div>
+                    <h2 className="text-base font-semibold text-gray-900">MongoDB Database</h2>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    {project.database.containerStatus && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Status</span>
+                        <div className="mt-1">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                              project.database.containerStatus === "Running"
+                                ? "bg-green-600 text-white"
+                                : project.database.containerStatus === "Stopped"
+                                ? "bg-gray-400 text-white"
+                                : "bg-red-500 text-white"
+                            }`}
+                          >
+                            {project.database.containerStatus}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {project.database.containerId && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Container ID</span>
+                        <p className="mt-1 font-mono text-xs text-gray-800">
+                          {project.database.containerId}
+                        </p>
+                      </div>
+                    )}
+                    {project.database.containerImage && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Image</span>
+                        <p className="mt-1 break-all font-mono text-xs text-gray-800">
+                          {project.database.containerImage}
+                        </p>
+                      </div>
+                    )}
+                    {project.database.databaseName && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Database Name</span>
+                        <p className="mt-1 font-mono text-sm font-semibold text-green-700">
+                          {project.database.databaseName}
+                        </p>
+                      </div>
+                    )}
+                    {project.database.port && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Port</span>
+                        <p className="mt-1 font-mono text-sm text-gray-800">
+                          {project.database.port}
+                        </p>
+                      </div>
+                    )}
+                    {project.database.username && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Username</span>
+                        <p className="mt-1 font-mono text-xs text-gray-800">
+                          {project.database.username}
+                        </p>
+                      </div>
+                    )}
+                    {project.database.connectionString && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Connection String</span>
+                        <div className="mt-1 flex items-center gap-2">
+                          <p 
+                            className="flex-1 break-all font-mono text-xs text-gray-800 cursor-text select-all"
+                            onClick={(e) => {
+                              const text = e.currentTarget.textContent;
+                              if (text) {
+                                const selection = window.getSelection();
+                                const range = document.createRange();
+                                range.selectNodeContents(e.currentTarget);
+                                selection?.removeAllRanges();
+                                selection?.addRange(range);
+                              }
+                            }}
+                          >
+                            {project.database.connectionString}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const connectionString = project.database!.connectionString!;
+                              try {
+                                // Try modern clipboard API first
+                                if (navigator.clipboard && navigator.clipboard.writeText) {
+                                  await navigator.clipboard.writeText(connectionString);
+                                  toast.success("Connection string copied to clipboard");
+                                  return;
+                                }
+                                
+                                // Fallback: use execCommand
+                                const textArea = document.createElement("textarea");
+                                textArea.value = connectionString;
+                                textArea.style.position = "fixed";
+                                textArea.style.left = "-999999px";
+                                document.body.appendChild(textArea);
+                                textArea.focus();
+                                textArea.select();
+                                
+                                const successful = document.execCommand("copy");
+                                document.body.removeChild(textArea);
+                                
+                                if (successful) {
+                                  toast.success("Connection string copied to clipboard");
+                                } else {
+                                  throw new Error("execCommand failed");
+                                }
+                              } catch (error) {
+                                toast.error("Failed to copy", {
+                                  description: "Please select and copy manually",
+                                });
+                              }
+                            }}
+                            className="h-7 border-green-300 bg-white text-xs text-green-700 hover:bg-green-50 flex-shrink-0"
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {project.database.volumePath && (
+                      <div className="rounded-md bg-green-50 p-2">
+                        <span className="text-xs font-medium text-gray-700">Volume Path</span>
+                        <p className="mt-1 break-all font-mono text-xs text-gray-800">
+                          {project.database.volumePath}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-            {project.dockerComposePath && (
-              <div className="rounded-md bg-gray-50 p-2">
-                <span className="text-xs font-medium text-gray-600">Docker Compose</span>
-                <p className="mt-1 break-all font-mono text-xs text-gray-800">
-                  {project.dockerComposePath}
-                </p>
-              </div>
-            )}
-            <div className="rounded-md bg-gray-50 p-2">
-              <span className="text-xs font-medium text-gray-600">Project Directory</span>
-              <p className="mt-1 break-all font-mono text-xs text-gray-800">
-                {project.directory}
-              </p>
             </div>
-          </div>
-        </div>
-      </div>
+          </TabsContent>
+        )}
+      </Tabs>
 
 
       {/* Deploy Logs Modal - Netlify Style */}
