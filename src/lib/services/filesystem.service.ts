@@ -768,11 +768,15 @@ export async function writeDockerCompose(
   console.log(`[DOCKER-COMPOSE] Static export detected: ${isStaticExport}`);
   console.log(`[DOCKER-COMPOSE] Repo path: ${repoPath}`);
   
+  // Quote service name if it starts with a number to prevent YAML parsing issues
+  // Docker Compose requires service names to be strings, not numbers
+  const serviceNameKey = /^\d/.test(projectName) ? `"${projectName}"` : projectName;
+  
   if (isStaticExport) {
     console.log(`[DOCKER-COMPOSE] Generating SSG docker-compose.yml (nginx on port 80)`);
     // SSG sites use nginx on port 80, no environment variables needed
     const dockerComposeContent = `services:
-  ${projectName}:
+  ${serviceNameKey}:
     container_name: ${projectName}
     build:
       context: ../${repoName}
@@ -811,7 +815,7 @@ networks:
   
   // Exact structure from your workflow (SSR)
   const dockerComposeContent = `services:
-  ${projectName}:
+  ${serviceNameKey}:
     container_name: ${projectName}
     build:
       context: ../${repoName}
@@ -899,10 +903,13 @@ export async function writeDatabaseCompose(
 
   const dockerComposePath = join(databaseDir, "docker-compose.yml");
   
+  // Quote service name if it starts with a number to prevent YAML parsing issues
+  const serviceNameKey = /^\d/.test(projectName) ? `"${projectName}-mongo"` : `${projectName}-mongo`;
+  
   // MongoDB compose with generated credentials
   const dockerComposeContent = `version: '3.9'
 services:
-  ${projectName}-mongo:
+  ${serviceNameKey}:
     image: mongo:7
     container_name: ${projectName}-mongo
     restart: unless-stopped
