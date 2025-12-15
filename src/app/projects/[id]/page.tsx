@@ -827,20 +827,52 @@ export default function ProjectDetailPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-gray-900">{project.name}</h1>
-            <div className="flex items-center gap-3">
-              <span
-                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-                  project.status === "Running"
-                    ? "bg-green-100 text-green-800"
-                    : project.status === "Building"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : project.status === "Error"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {project.status}
-              </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Website Status */}
+              {project.repo !== "Database Only" && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-600">Website:</span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
+                      project.status === "Running"
+                        ? "bg-green-100 text-green-800"
+                        : project.status === "Building"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : project.status === "Error"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${
+                      project.status === "Running" ? "bg-green-600" : 
+                      project.status === "Building" ? "bg-yellow-600" : 
+                      project.status === "Error" ? "bg-red-600" : "bg-gray-600"
+                    }`}></span>
+                    {project.status}
+                  </span>
+                </div>
+              )}
+              {/* Database Status */}
+              {project.database && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-600">Database:</span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
+                      project.database.containerStatus === "Running"
+                        ? "bg-green-100 text-green-800"
+                        : project.database.containerStatus === "Stopped"
+                        ? "bg-gray-100 text-gray-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${
+                      project.database.containerStatus === "Running" ? "bg-green-600" : 
+                      project.database.containerStatus === "Stopped" ? "bg-gray-600" : "bg-red-600"
+                    }`}></span>
+                    {project.database.containerStatus || "Unknown"}
+                  </span>
+                </div>
+              )}
               {project.domain && !project.domain.startsWith("ERROR") && project.domain !== "N/A" && (
                 <a
                   href={`https://${project.domain}`}
@@ -883,7 +915,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue={project.repo !== "Database Only" ? "website" : project.database ? "database" : "project"} className="w-full mb-6">
+      <Tabs defaultValue="project" className="w-full mb-6">
         <TabsList className={`grid w-full max-w-2xl ${
           project.repo !== "Database Only" && project.database 
             ? "grid-cols-3" 
@@ -891,14 +923,14 @@ export default function ProjectDetailPage() {
             ? "grid-cols-2" 
             : "grid-cols-1"
         }`}>
+          <TabsTrigger value="project" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">
+            📦 Project
+          </TabsTrigger>
           {project.repo !== "Database Only" && (
             <TabsTrigger value="website" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               🌐 Website
             </TabsTrigger>
           )}
-          <TabsTrigger value="project" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">
-            📦 Project
-          </TabsTrigger>
           {project.database && (
             <TabsTrigger value="database" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
               🍃 Database
@@ -1151,7 +1183,7 @@ export default function ProjectDetailPage() {
         {/* Project Info Tab - Gray Theme */}
         <TabsContent value="project" className="mt-6">
           <div className="rounded-lg border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-6 shadow-lg">
-            <div className="mb-6 grid gap-6 md:grid-cols-2">
+            <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {/* Project Information */}
               <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
@@ -1160,41 +1192,109 @@ export default function ProjectDetailPage() {
                   </div>
                   <h2 className="text-base font-semibold text-gray-900">Project Information</h2>
                 </div>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-3 text-sm">
                   <div>
                     <span className="font-medium text-gray-600">Name:</span>
                     <p className="mt-0.5 text-gray-900">{project.name}</p>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-600">Status:</span>
-                    <div className="mt-0.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          project.status === "Running"
-                            ? "bg-green-100 text-green-800"
-                            : project.status === "Building"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : project.status === "Error"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {project.status}
-                      </span>
-                    </div>
-                  </div>
-                  {project.createDatabase && (
-                    <div>
-                      <span className="font-medium text-gray-600">Database:</span>
-                      <p className="mt-0.5 text-green-600">✓ Enabled</p>
+                  
+                  {/* Website Status */}
+                  {project.repo !== "Database Only" && (
+                    <div className="rounded-md bg-blue-50 p-3 border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-700">Website Status:</span>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                            project.status === "Running"
+                              ? "bg-green-100 text-green-800"
+                              : project.status === "Building"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : project.status === "Error"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${
+                            project.status === "Running" ? "bg-green-600" : 
+                            project.status === "Building" ? "bg-yellow-600" : 
+                            project.status === "Error" ? "bg-red-600" : "bg-gray-600"
+                          }`}></span>
+                          {project.status}
+                        </span>
+                      </div>
                     </div>
                   )}
+                  
+                  {/* Database Status */}
+                  {project.database && (
+                    <div className="rounded-md bg-green-50 p-3 border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-700">Database Status:</span>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                            project.database.containerStatus === "Running"
+                              ? "bg-green-100 text-green-800"
+                              : project.database.containerStatus === "Stopped"
+                              ? "bg-gray-100 text-gray-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${
+                            project.database.containerStatus === "Running" ? "bg-green-600" : 
+                            project.database.containerStatus === "Stopped" ? "bg-gray-600" : "bg-red-600"
+                          }`}></span>
+                          {project.database.containerStatus || "Unknown"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {project.lastDeployment && (
                     <div>
                       <span className="font-medium text-gray-600">Last Deployment:</span>
                       <p className="mt-0.5 text-xs text-gray-900">{project.lastDeployment}</p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Delete Project */}
+              <div className="rounded-lg border border-red-200 bg-red-50 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
+                    <span className="text-lg">🗑️</span>
+                  </div>
+                  <h2 className="text-base font-semibold text-gray-900">Danger Zone</h2>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Delete Project
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Verwijder project en alle containers
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={actionLoading !== null}
+                      className="min-w-[120px]"
+                    >
+                      {actionLoading === "delete" ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">🗑️</span>
+                          Delete
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -1380,6 +1480,93 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Database Actions */}
+              <div className="mt-6 rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Database Actions</h3>
+                  {project.database && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                        project.database.containerStatus === "Running"
+                          ? "bg-green-100 text-green-800"
+                          : project.database.containerStatus === "Stopped"
+                          ? "bg-gray-100 text-gray-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${
+                        project.database.containerStatus === "Running" ? "bg-green-600" : 
+                        project.database.containerStatus === "Stopped" ? "bg-gray-600" : "bg-red-600"
+                      }`}></span>
+                      {project.database.containerStatus || "Unknown"}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  {/* Backup Database */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Backup Database
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Maak een backup van de database
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleBackup}
+                      disabled={actionLoading !== null}
+                      className="min-w-[120px] border-green-300 hover:bg-green-50"
+                    >
+                      {actionLoading === "backup" ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Backing up...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">💾</span>
+                          Backup
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="border-t border-green-200"></div>
+
+                  {/* Restart Database */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Restart Database
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Herstart database zonder data te verliezen
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleRestartDatabase}
+                      disabled={actionLoading !== null}
+                      className="min-w-[120px] border-green-300 hover:bg-green-50"
+                    >
+                      {actionLoading === "restart-database" ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Restarting...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">🔄</span>
+                          Restart
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
         )}
@@ -1418,231 +1605,6 @@ export default function ProjectDetailPage() {
         isDeploying={actionLoading === "deploy"}
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
-        {/* Website Actions - Only show for website projects */}
-        {project.repo !== "Database Only" && (
-        <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Website Actions</h3>
-          <div className="space-y-4">
-            {/* Step 1: Git Pull */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 mb-1">
-                  Klaar met development?
-                </p>
-                <p className="text-xs text-gray-500">
-                  Pull de laatste wijzigingen van GitHub
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleUpdate}
-                disabled={actionLoading !== null}
-                className={`min-w-[120px] ${
-                  gitStatus?.isBehind
-                    ? "animate-pulse border-orange-500 bg-orange-50 hover:bg-orange-100"
-                    : ""
-                }`}
-              >
-                {actionLoading === "update" ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">
-                      {gitStatus?.isBehind ? "⚠️" : "📥"}
-                    </span>
-                    Git pull
-                    {gitStatus?.isBehind && gitStatus.commitsBehind > 0 && (
-                      <span className="ml-2 text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">
-                        {gitStatus.commitsBehind}
-                      </span>
-                    )}
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="border-t border-blue-200"></div>
-
-            {/* Step 2: Build */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 mb-1">
-                  Build Images
-                </p>
-                <p className="text-xs text-gray-500">
-                  Build nieuwe Docker images
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  handleBuild();
-                }}
-                disabled={actionLoading !== null}
-                className="min-w-[140px] bg-yellow-600 hover:bg-yellow-700"
-              >
-                {actionLoading === "build" ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Building...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">🔨</span>
-                    Build
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="border-t border-blue-200"></div>
-
-            {/* Step 3: Deploy */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 mb-1">
-                  Deploy
-                </p>
-                <p className="text-xs text-gray-500">
-                  Stop containers en start opnieuw
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  handleDeploy();
-                }}
-                disabled={actionLoading !== null}
-                className="min-w-[140px] bg-blue-600 hover:bg-blue-700"
-              >
-                {actionLoading === "deploy" ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Deploying...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">🚀</span>
-                    Deploy
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="border-t border-blue-200"></div>
-
-            {/* Delete Project */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 mb-1">
-                  Delete Project
-                </p>
-                <p className="text-xs text-gray-500">
-                  Verwijder project en alle containers
-                </p>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={actionLoading !== null}
-                className="min-w-[120px]"
-              >
-                {actionLoading === "delete" ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">🗑️</span>
-                    Delete
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-        )}
-
-        {/* Database Actions */}
-        {project?.database ? (
-          <div className="rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-5 shadow-sm">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">Database Actions</h3>
-            <div className="space-y-4">
-              {/* Backup Database */}
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-700 mb-1">
-                    Backup Database
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Maak een backup van de database
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleBackup}
-                  disabled={actionLoading !== null}
-                  className="min-w-[120px] border-green-300 hover:bg-green-50"
-                >
-                  {actionLoading === "backup" ? (
-                    <>
-                      <span className="mr-2">⏳</span>
-                      Backing up...
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">💾</span>
-                      Backup
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <div className="border-t border-green-200"></div>
-
-              {/* Restart Database */}
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-700 mb-1">
-                    Restart Database
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Herstart database zonder data te verliezen
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleRestartDatabase}
-                  disabled={actionLoading !== null}
-                  className="min-w-[120px] border-green-300 hover:bg-green-50"
-                >
-                  {actionLoading === "restart-database" ? (
-                    <>
-                      <span className="mr-2">⏳</span>
-                      Restarting...
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">🔄</span>
-                      Restart
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-5 shadow-sm">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">Database Actions</h3>
-            <p className="text-sm text-gray-500">
-              No database configured for this project
-            </p>
-          </div>
-        )}
-      </div>
 
       <Tabs defaultValue="logs" className="w-full">
         <TabsList>
