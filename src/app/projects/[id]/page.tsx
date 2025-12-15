@@ -841,7 +841,7 @@ export default function ProjectDetailPage() {
               >
                 {project.status}
               </span>
-              {project.domain && !project.domain.startsWith("ERROR") && (
+              {project.domain && !project.domain.startsWith("ERROR") && project.domain !== "N/A" && (
                 <a
                   href={`https://${project.domain}`}
                   target="_blank"
@@ -915,27 +915,31 @@ export default function ProjectDetailPage() {
                 </span>
               </div>
             </div>
-            <div>
-              <span className="font-medium text-gray-600">Port:</span>
-              <p className="mt-0.5 font-mono text-gray-900">{project.port}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-600">Domain:</span>
-              <p className="mt-0.5">
-                {project.domain.startsWith("ERROR") ? (
-                  <span className="text-red-600">{project.domain}</span>
-                ) : (
-                  <a
-                    href={`https://${project.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {project.domain}
-                  </a>
-                )}
-              </p>
-            </div>
+            {project.repo !== "Database Only" && (
+              <>
+                <div>
+                  <span className="font-medium text-gray-600">Port:</span>
+                  <p className="mt-0.5 font-mono text-gray-900">{project.port}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Domain:</span>
+                  <p className="mt-0.5">
+                    {project.domain.startsWith("ERROR") || project.domain === "N/A" ? (
+                      <span className="text-red-600">{project.domain}</span>
+                    ) : (
+                      <a
+                        href={`https://${project.domain}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {project.domain}
+                      </a>
+                    )}
+                  </p>
+                </div>
+              </>
+            )}
             {project.createDatabase && (
               <div>
                 <span className="font-medium text-gray-600">Database:</span>
@@ -1367,7 +1371,8 @@ export default function ProjectDetailPage() {
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
-        {/* Website Actions */}
+        {/* Website Actions - Only show for website projects */}
+        {project.repo !== "Database Only" && (
         <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
           <h3 className="mb-4 text-lg font-semibold text-gray-900">Website Actions</h3>
           <div className="space-y-4">
@@ -1511,6 +1516,7 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Database Actions */}
         {project?.database ? (
