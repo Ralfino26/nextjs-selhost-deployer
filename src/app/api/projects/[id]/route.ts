@@ -19,6 +19,117 @@ export async function GET(
     const projectName = id;
     const projectDir = join(config.projectsBaseDir, projectName);
 
+    // Check if project directory exists
+    try {
+      await readdir(projectDir);
+    } catch {
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    // Find directories
+    const projectSubDirs = await readdir(projectDir, { withFileTypes: true });
+    const repoDir = projectSubDirs.find(
+      (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
+    );
+    const hasDatabase = projectSubDirs.some(
+      (d) => d.isDirectory() && d.name === "database"
+    );
+    const isDatabaseOnly = hasDatabase && !repoDir;
+
+    // For database-only projects, skip docker-compose.yml and repo checks
+    if (isDatabaseOnly) {
+      const status = await getProjectStatus(projectName);
+
+      // Get Database information
+      let databaseInfo: ProjectDetails["database"] | undefined;
+      
+      try {
+        const databaseComposePath = join(projectDir, "database", "docker-compose.yml");
+        const databaseComposeContent = await readFile(databaseComposePath, "utf-8").catch(() => "");
+        
+        // Extract database info from docker-compose.yml
+        const dbNameMatch = databaseComposeContent.match(/MONGO_INITDB_DATABASE:\s*(\w+)/);
+        const portMatch = databaseComposeContent.match(/ports:\s*-\s*"(\d+):/);
+        const imageMatch = databaseComposeContent.match(/image:\s*([^\s]+)/);
+        
+        // Extract credentials from docker-compose.yml
+        const usernameMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_USERNAME:\s*(\w+)/);
+        const passwordMatch = databaseComposeContent.match(/MONGO_INITDB_ROOT_PASSWORD:\s*([^\s]+)/);
+        
+        const databaseName = dbNameMatch ? dbNameMatch[1] : projectName;
+        const databasePort = portMatch ? parseInt(portMatch[1], 10) : 27027;
+        const databaseImage = imageMatch ? imageMatch[1] : undefined;
+        const databaseVolumePath = join(projectDir, "database", "data");
+        
+        if (!usernameMatch || !passwordMatch) {
+          throw new Error(`Could not extract MongoDB credentials from docker-compose.yml for project ${projectName}`);
+        }
+        const dbUser = usernameMatch[1];
+        const dbPassword = passwordMatch[1];
+        
+        // Get database container information
+        const dbContainerName = `${projectName}-mongo`;
+        let dbContainerId: string | undefined;
+        let dbContainerStatus: "Running" | "Stopped" | "Error" | undefined;
+        let dbContainerImage: string | undefined;
+        
+        try {
+          const { getDocker } = await import("@/lib/services/docker.service");
+          const docker = await getDocker();
+          const dbContainer = docker.getContainer(dbContainerName);
+          const dbInfo = await dbContainer.inspect();
+          
+          dbContainerId = dbInfo.Id.substring(0, 12);
+          dbContainerImage = dbInfo.Config?.Image;
+          
+          if (dbInfo.State.Running) {
+            dbContainerStatus = "Running";
+          } else if (dbInfo.State.Status === "exited") {
+            dbContainerStatus = "Stopped";
+          } else {
+            dbContainerStatus = "Error";
+          }
+        } catch (error) {
+          dbContainerStatus = "Stopped";
+        }
+        
+        const connectionString = `mongodb://${dbUser}:${dbPassword}@localhost:${databasePort}/${databaseName}?authSource=admin`;
+        
+        databaseInfo = {
+          containerId: dbContainerId,
+          containerStatus: dbContainerStatus,
+          containerImage: dbContainerImage || databaseImage,
+          databaseName,
+          port: databasePort,
+          connectionString,
+          volumePath: databaseVolumePath,
+          username: dbUser,
+        };
+      } catch (error) {
+        console.warn(`Failed to get database info for ${projectName}:`, error);
+      }
+
+      const project: ProjectDetails = {
+        id: projectName,
+        name: projectName,
+        repo: "Database Only",
+        port: 0,
+        domain: "N/A",
+        createDatabase: true,
+        status,
+        directory: projectDir,
+        dockerComposePath: undefined,
+        repoPath: undefined,
+        database: databaseInfo,
+      };
+
+      return NextResponse.json(project);
+    }
+
+    // For website projects, require docker-compose.yml and repo
     const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
 
     try {
@@ -26,22 +137,12 @@ export async function GET(
       const portMatch = content.match(/ports:\s*-\s*"(\d+):/);
       const port = portMatch ? parseInt(portMatch[1], 10) : 0;
 
-      // Find repo name
-      const projectSubDirs = await readdir(projectDir, { withFileTypes: true });
-      const repoDir = projectSubDirs.find(
-        (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
-      );
-
       if (!repoDir) {
         return NextResponse.json(
           { error: "Repository directory not found" },
           { status: 404 }
         );
       }
-
-      const hasDatabase = projectSubDirs.some(
-        (d) => d.isDirectory() && d.name === "database"
-      );
 
       // Get domain from Nginx Proxy Manager (with timeout)
       let domain: string | null = null;
