@@ -6,10 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
-  Loader2, 
   Plus, 
   Search, 
-  ExternalLink, 
   Database, 
   Server, 
   AlertCircle,
@@ -18,7 +16,6 @@ import {
   XCircle,
   Globe,
   Settings,
-  RefreshCw,
   GitBranch
 } from "lucide-react";
 import { Project } from "@/types/project";
@@ -31,7 +28,6 @@ export default function Home() {
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [restarting, setRestarting] = useState<Record<string, "website" | "database" | null>>({});
 
   const fetchProjects = useCallback(async () => {
     // Always set loading to true at the start
@@ -146,67 +142,6 @@ export default function Home() {
     }
   };
 
-  const handleRestartWebsite = async (projectId: string) => {
-    setRestarting((prev) => ({ ...prev, [projectId]: "website" }));
-    try {
-      const auth = sessionStorage.getItem("auth");
-      const response = await fetch(`/api/projects/${projectId}/restart`, {
-        method: "POST",
-        headers: auth ? { Authorization: `Basic ${auth}` } : {},
-      });
-      
-      if (response.ok) {
-        toast.success("Website restarted", {
-          description: "The website has been restarted successfully",
-        });
-        // Refresh projects list
-        await fetchProjects();
-      } else {
-        const error = await response.json();
-        toast.error("Restart failed", {
-          description: error.error || "Failed to restart website",
-        });
-      }
-    } catch (error) {
-      console.error("Error restarting website:", error);
-      toast.error("Restart failed", {
-        description: "Failed to restart website",
-      });
-    } finally {
-      setRestarting((prev) => ({ ...prev, [projectId]: null }));
-    }
-  };
-
-  const handleRestartDatabase = async (projectId: string) => {
-    setRestarting((prev) => ({ ...prev, [projectId]: "database" }));
-    try {
-      const auth = sessionStorage.getItem("auth");
-      const response = await fetch(`/api/projects/${projectId}/database/restart`, {
-        method: "POST",
-        headers: auth ? { Authorization: `Basic ${auth}` } : {},
-      });
-      
-      if (response.ok) {
-        toast.success("Database restarted", {
-          description: "The database has been restarted successfully",
-        });
-        // Refresh projects list
-        await fetchProjects();
-      } else {
-        const error = await response.json();
-        toast.error("Restart failed", {
-          description: error.error || "Failed to restart database",
-        });
-      }
-    } catch (error) {
-      console.error("Error restarting database:", error);
-      toast.error("Restart failed", {
-        description: "Failed to restart database",
-      });
-    } finally {
-      setRestarting((prev) => ({ ...prev, [projectId]: null }));
-    }
-  };
 
   if (loading) {
     return (
@@ -306,10 +241,16 @@ export default function Home() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
+          {filteredProjects.map((project) => {
+            const isDatabaseOnly = project.repo === "Database Only";
+            const cardColorClass = isDatabaseOnly 
+              ? "bg-gradient-to-br from-green-50 to-white border-green-200" 
+              : "bg-gradient-to-br from-blue-50 to-white border-blue-200";
+            
+            return (
             <div
               key={project.id}
-              className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow duration-200"
+              className={`${cardColorClass} border-2 rounded-lg p-6 hover:shadow-lg transition-shadow duration-200`}
             >
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
@@ -353,12 +294,24 @@ export default function Home() {
                   <span className="truncate">Port: {project.port}</span>
                 </div>
                 
-                {project.domain && !project.domain.includes("ERROR") && (
+                {project.domain && !project.domain.includes("ERROR") && project.domain !== "N/A" && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="truncate" title={project.domain}>
-                      {project.domain}
-                    </span>
+                    {project.status === "Running" ? (
+                      <a
+                        href={`https://${project.domain}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate text-blue-600 hover:text-blue-800 hover:underline"
+                        title={project.domain}
+                      >
+                        {project.domain}
+                      </a>
+                    ) : (
+                      <span className="truncate" title={project.domain}>
+                        {project.domain}
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -370,64 +323,18 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Quick Actions */}
-              <div className="pt-4 border-t border-gray-100 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-2"
-                    onClick={() => handleRestartWebsite(project.id)}
-                    disabled={restarting[project.id] === "website" || project.status === "Building"}
-                  >
-                    {restarting[project.id] === "website" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    Restart Website
+              {/* Actions */}
+              <div className="pt-4 border-t border-gray-200">
+                <Link href={`/projects/${project.id}`} className="block">
+                  <Button variant="outline" size="sm" className="w-full gap-2">
+                    <Settings className="h-4 w-4" />
+                    Manage
                   </Button>
-                  {project.createDatabase && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2"
-                      onClick={() => handleRestartDatabase(project.id)}
-                      disabled={restarting[project.id] === "database"}
-                    >
-                      {restarting[project.id] === "database" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Database className="h-4 w-4" />
-                      )}
-                      Restart DB
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link href={`/projects/${project.id}`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full gap-2">
-                      <Settings className="h-4 w-4" />
-                      Manage
-                    </Button>
-                  </Link>
-                  {project.domain && 
-                   !project.domain.includes("ERROR") && 
-                   project.status === "Running" && (
-                    <a
-                      href={`https://${project.domain}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </a>
-                  )}
-                </div>
+                </Link>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
