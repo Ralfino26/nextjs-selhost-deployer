@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deployProjectOnly } from "@/lib/services/docker.service";
+import { buildProject } from "@/lib/services/docker.service";
 
 export async function POST(
   request: NextRequest,
@@ -8,13 +8,13 @@ export async function POST(
   try {
     const { id } = await params;
     const projectName = id;
-    await deployProjectOnly(projectName);
+    await buildProject(projectName);
 
-    return NextResponse.json({ success: true, message: "Project deployed" });
+    return NextResponse.json({ success: true, message: "Project built" });
   } catch (error) {
-    console.error("Error deploying project:", error);
+    console.error("Error building project:", error);
     return NextResponse.json(
-      { error: "Failed to deploy project" },
+      { error: "Failed to build project" },
       { status: 500 }
     );
   }

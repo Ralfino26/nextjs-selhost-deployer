@@ -82,6 +82,81 @@ export async function deployProject(projectName: string): Promise<void> {
   });
 }
 
+// Build only - just build the images without starting
+export async function buildProject(projectName: string): Promise<void> {
+  const projectDir = join(config.projectsBaseDir, projectName);
+  const dockerComposeDir = join(projectDir, "docker");
+
+  // Regenerate Dockerfile and docker-compose.yml to ensure SSG detection is up-to-date
+  const { readdir, readFile } = await import("fs/promises");
+  const projectSubDirs = await readdir(projectDir, { withFileTypes: true });
+  const repoDir = projectSubDirs.find(
+    (dir) => dir.isDirectory() && dir.name !== "docker" && dir.name !== "database"
+  );
+  
+  if (repoDir) {
+    const repoName = repoDir.name;
+    const { writeDockerfile, writeDockerCompose } = await import("@/lib/services/filesystem.service");
+    
+    // Regenerate Dockerfile with force to detect SSG
+    await writeDockerfile(projectDir, repoName, true);
+    
+    // Read existing docker-compose.yml to get port and env vars
+    const dockerComposePath = join(dockerComposeDir, "docker-compose.yml");
+    let port = 3000;
+    let envVars: { key: string; value: string }[] = [];
+    
+    try {
+      const existingContent = await readFile(dockerComposePath, "utf-8");
+      // Extract port (supports both SSG :80 and SSR :3000)
+      const ssgPortMatch = existingContent.match(/ports:\s*-\s*"(\d+):80"/);
+      const ssrPortMatch = existingContent.match(/ports:\s*-\s*"(\d+):3000"/);
+      if (ssgPortMatch) {
+        port = parseInt(ssgPortMatch[1], 10);
+      } else if (ssrPortMatch) {
+        port = parseInt(ssrPortMatch[1], 10);
+      }
+      
+      // Extract environment variables
+      const envMatch = existingContent.match(/environment:\s*\n((?:\s+[^\n]+\n?)+)/);
+      if (envMatch) {
+        const envLines = envMatch[1].trim().split("\n");
+        for (const line of envLines) {
+          const match = line.trim().match(/^([^:]+):\s*(.+)$/);
+          if (match && match[1] !== "NODE_ENV") {
+            envVars.push({ key: match[1].trim(), value: match[2].trim() });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`Could not read existing docker-compose.yml, using defaults:`, error);
+    }
+    
+    // Regenerate docker-compose.yml with SSG detection
+    await writeDockerCompose(projectDir, projectName, repoName, port, envVars);
+  }
+
+  // Build only
+  await execAsync(`docker compose build`, {
+    cwd: dockerComposeDir,
+  });
+}
+
+// Deploy only - down and up -d (assumes images are already built)
+export async function deployProjectOnly(projectName: string): Promise<void> {
+  const projectDir = join(config.projectsBaseDir, projectName);
+  const dockerComposeDir = join(projectDir, "docker");
+
+  // Down and up -d
+  await execAsync(`docker compose down`, {
+    cwd: dockerComposeDir,
+  });
+  
+  await execAsync(`docker compose up -d`, {
+    cwd: dockerComposeDir,
+  });
+}
+
 // Deploy with streaming logs
 export async function deployProjectWithLogs(
   projectName: string,

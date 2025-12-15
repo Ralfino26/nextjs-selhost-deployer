@@ -436,7 +436,67 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleBuild = async () => {
+    setActionLoading("build");
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/build`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      
+      if (response.ok) {
+        toast.success("Build completed", {
+          description: `${project?.name} has been built successfully`,
+        });
+        await fetchProject();
+      } else {
+        const error = await response.json();
+        toast.error("Build failed", {
+          description: error.error || "Failed to build project",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error building:", error);
+      toast.error("Build failed", {
+        description: error.message || "Failed to build project",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDeploy = async () => {
+    setActionLoading("deploy");
+    try {
+      const auth = sessionStorage.getItem("auth");
+      const response = await fetch(`/api/projects/${projectId}/deploy`, {
+        method: "POST",
+        headers: auth ? { Authorization: `Basic ${auth}` } : {},
+      });
+      
+      if (response.ok) {
+        toast.success("Deployment completed", {
+          description: `${project?.name} has been deployed successfully`,
+        });
+        await fetchProject();
+      } else {
+        const error = await response.json();
+        toast.error("Deployment failed", {
+          description: error.error || "Failed to deploy project",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error deploying:", error);
+      toast.error("Deployment failed", {
+        description: error.message || "Failed to deploy project",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeployWithLogs = async () => {
     setActionLoading("deploy");
     setShowDeployLogs(true);
     setDeployLogs("");
@@ -1354,14 +1414,47 @@ export default function ProjectDetailPage() {
 
             <div className="border-t border-blue-200"></div>
 
-            {/* Step 2: Deploy */}
+            {/* Step 2: Build */}
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-700 mb-1">
-                  Klaar om te deployen?
+                  Build Images
                 </p>
                 <p className="text-xs text-gray-500">
-                  Stop containers, build nieuwe images en start opnieuw
+                  Build nieuwe Docker images
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  handleBuild();
+                }}
+                disabled={actionLoading !== null}
+                className="min-w-[140px] bg-yellow-600 hover:bg-yellow-700"
+              >
+                {actionLoading === "build" ? (
+                  <>
+                    <span className="mr-2">⏳</span>
+                    Building...
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-2">🔨</span>
+                    Build
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="border-t border-blue-200"></div>
+
+            {/* Step 3: Deploy */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Deploy
+                </p>
+                <p className="text-xs text-gray-500">
+                  Stop containers en start opnieuw
                 </p>
               </div>
               <Button
@@ -1379,7 +1472,7 @@ export default function ProjectDetailPage() {
                 ) : (
                   <>
                     <span className="mr-2">🚀</span>
-                    Deploy & Restart
+                    Deploy
                   </>
                 )}
               </Button>
