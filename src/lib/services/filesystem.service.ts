@@ -654,10 +654,8 @@ WORKDIR /usr/share/nginx/html
 
 # Copy static files from build
 # Next.js static export outputs to 'out' directory by default
+# The 'out' directory already contains all static files including public assets
 COPY --from=builder /app/out /usr/share/nginx/html
-
-# Copy public folder if it exists (for assets)
-COPY --from=builder /app/public /usr/share/nginx/html/public 2>/dev/null || true
 
 # Nginx configuration for SPA routing
 RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
