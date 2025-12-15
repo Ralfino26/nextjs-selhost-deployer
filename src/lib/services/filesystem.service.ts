@@ -768,16 +768,17 @@ export async function writeDockerCompose(
   console.log(`[DOCKER-COMPOSE] Static export detected: ${isStaticExport}`);
   console.log(`[DOCKER-COMPOSE] Repo path: ${repoPath}`);
   
-  // Quote service name if it starts with a number to prevent YAML parsing issues
-  // Docker Compose requires service names to be strings, not numbers
+  // Quote service name and container_name if they start with a number to prevent YAML parsing issues
+  // Docker Compose requires service names and container names to be strings, not numbers
   const serviceNameKey = /^\d/.test(projectName) ? `"${projectName}"` : projectName;
+  const containerName = /^\d/.test(projectName) ? `"${projectName}"` : projectName;
   
   if (isStaticExport) {
     console.log(`[DOCKER-COMPOSE] Generating SSG docker-compose.yml (nginx on port 80)`);
     // SSG sites use nginx on port 80, no environment variables needed
     const dockerComposeContent = `services:
   ${serviceNameKey}:
-    container_name: ${projectName}
+    container_name: ${containerName}
     build:
       context: ../${repoName}
       dockerfile: Dockerfile
@@ -816,7 +817,7 @@ networks:
   // Exact structure from your workflow (SSR)
   const dockerComposeContent = `services:
   ${serviceNameKey}:
-    container_name: ${projectName}
+    container_name: ${containerName}
     build:
       context: ../${repoName}
       dockerfile: Dockerfile
@@ -903,15 +904,16 @@ export async function writeDatabaseCompose(
 
   const dockerComposePath = join(databaseDir, "docker-compose.yml");
   
-  // Quote service name if it starts with a number to prevent YAML parsing issues
+  // Quote service name and container_name if they start with a number to prevent YAML parsing issues
   const serviceNameKey = /^\d/.test(projectName) ? `"${projectName}-mongo"` : `${projectName}-mongo`;
+  const containerName = /^\d/.test(projectName) ? `"${projectName}-mongo"` : `${projectName}-mongo`;
   
   // MongoDB compose with generated credentials
   const dockerComposeContent = `version: '3.9'
 services:
   ${serviceNameKey}:
     image: mongo:7
-    container_name: ${projectName}-mongo
+    container_name: ${containerName}
     restart: unless-stopped
     command: ["mongod", "--bind_ip_all"]
     environment:
