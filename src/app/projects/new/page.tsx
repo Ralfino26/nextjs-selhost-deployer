@@ -208,7 +208,7 @@ export default function NewProjectPage() {
           repo: projectType === "database-website" ? selectedRepo!.full_name : null,
           projectName: formData.projectName,
           port: projectType === "database-website" ? parseInt(formData.port, 10) : 0,
-          createDatabase: true, // Always true for both types
+          createDatabase: formData.createDatabase, // Use user's choice
           projectType: projectType,
           envVars: [], // Environment variables can be added later via the interface
         }),
@@ -362,7 +362,7 @@ export default function NewProjectPage() {
             <button
               onClick={() => {
                 setProjectType("database-website");
-                setFormData({ ...formData, createDatabase: true });
+                // Don't force createDatabase, let user choose
               }}
               className={`relative rounded-lg border-2 p-6 text-left transition-all ${
                 projectType === "database-website"
