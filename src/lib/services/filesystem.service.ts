@@ -156,14 +156,19 @@ export async function detectStaticExport(repoPath: string): Promise<boolean> {
     return true;
   }
 
-  // If no explicit output: 'export', check if the project is fully static
-  // by analyzing the code structure
-  const isFullyStatic = await detectFullyStaticProject(repoPath);
-  if (isFullyStatic) {
-    console.log(`[SSG DETECT] Project appears to be fully static (no API routes, no server components)`);
-    return true;
-  }
+  // IMPORTANT: Only use automatic detection if user explicitly wants it
+  // For now, we require explicit output: 'export' to use SSG
+  // This prevents false positives where SSR sites are incorrectly detected as SSG
+  // 
+  // If you want automatic detection, uncomment the code below:
+  // const isFullyStatic = await detectFullyStaticProject(repoPath);
+  // if (isFullyStatic) {
+  //   console.log(`[SSG DETECT] Project appears to be fully static (no API routes, no server components)`);
+  //   return true;
+  // }
 
+  // Default to SSR if no explicit output: 'export' is found
+  console.log(`[SSG DETECT] No explicit output: 'export' found - defaulting to SSR`);
   return false;
 }
 
@@ -184,16 +189,44 @@ async function detectFullyStaticProject(repoPath: string): Promise<boolean> {
     if (hasAppDir) {
       const apiRoute = join(appDir, "api");
       if (existsSync(apiRoute)) {
-        console.log(`[SSG DETECT] Found API routes in app/api - not fully static`);
-        return false;
+        // Check if there are any files in the api directory
+        try {
+          const apiFiles = await readdir(apiRoute, { recursive: true, withFileTypes: true });
+          // Filter out directories, only count actual files
+          const apiFileCount = apiFiles.filter(f => f.isFile() && 
+            (f.name.endsWith('.ts') || f.name.endsWith('.tsx') || 
+             f.name.endsWith('.js') || f.name.endsWith('.jsx'))).length;
+          if (apiFileCount > 0) {
+            console.log(`[SSG DETECT] Found API routes in app/api (${apiFileCount} route files) - not fully static`);
+            return false;
+          }
+        } catch (error) {
+          // If we can't read the directory, assume it has API routes to be safe
+          console.log(`[SSG DETECT] Found app/api directory (cannot read: ${error}) - assuming not fully static`);
+          return false;
+        }
       }
     }
 
     if (hasPagesDir) {
       const apiRoute = join(pagesDir, "api");
       if (existsSync(apiRoute)) {
-        console.log(`[SSG DETECT] Found API routes in pages/api - not fully static`);
-        return false;
+        // Check if there are any files in the api directory
+        try {
+          const apiFiles = await readdir(apiRoute, { recursive: true, withFileTypes: true });
+          // Filter out directories, only count actual files
+          const apiFileCount = apiFiles.filter(f => f.isFile() && 
+            (f.name.endsWith('.ts') || f.name.endsWith('.tsx') || 
+             f.name.endsWith('.js') || f.name.endsWith('.jsx'))).length;
+          if (apiFileCount > 0) {
+            console.log(`[SSG DETECT] Found API routes in pages/api (${apiFileCount} route files) - not fully static`);
+            return false;
+          }
+        } catch (error) {
+          // If we can't read the directory, assume it has API routes to be safe
+          console.log(`[SSG DETECT] Found pages/api directory (cannot read: ${error}) - assuming not fully static`);
+          return false;
+        }
       }
     }
 
