@@ -438,60 +438,214 @@ export default function ProjectDetailPage() {
 
   const handleBuild = async () => {
     setActionLoading("build");
+    setShowDeployLogs(true);
+    setDeployLogs("");
+    // Reset phases
+    setDeployPhases({
+      initializing: "pending",
+      building: "active",
+      deploying: "pending",
+      cleanup: "pending",
+      postProcessing: "pending",
+    });
+    
     try {
       const auth = sessionStorage.getItem("auth");
-      const response = await fetch(`/api/projects/${projectId}/build`, {
-        method: "POST",
+      const response = await fetch(`/api/projects/${projectId}/build/stream`, {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
-      
-      if (response.ok) {
-        toast.success("Build completed", {
-          description: `${project?.name} has been built successfully`,
-        });
-        await fetchProject();
-      } else {
-        const error = await response.json();
-        toast.error("Build failed", {
-          description: error.error || "Failed to build project",
-        });
+
+      if (!response.ok) {
+        throw new Error("Failed to start build");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let buildComplete = false;
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.log) {
+                const logText = data.log;
+                setDeployLogs((prev) => prev + logText);
+                
+                // Detect phase transitions
+                if (logText.includes("🔨 Building images") || logText.includes("Building images")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    building: "active",
+                  }));
+                } else if (logText.includes("✅ Build completed") || logText.includes("Build completed")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    building: "complete",
+                  }));
+                } else if (logText === "DONE") {
+                  buildComplete = true;
+                  setActionLoading(null);
+                  toast.success("Build completed", {
+                    description: `${project?.name} has been built successfully`,
+                  });
+                  await fetchProject();
+                  if (!isDeployModalMinimized) {
+                    setTimeout(() => {
+                      setShowDeployLogs(false);
+                    }, 2000);
+                  }
+                  return;
+                }
+                
+                // Auto-scroll to bottom
+                setTimeout(() => {
+                  const logElement = document.getElementById("deploy-logs");
+                  if (logElement) {
+                    logElement.scrollTop = logElement.scrollHeight;
+                  }
+                }, 100);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      if (!buildComplete) {
+        setActionLoading(null);
+        setDeployLogs((prev) => prev + "\n\n⚠️ Build stream ended unexpectedly\n");
       }
     } catch (error: any) {
       console.error("Error building:", error);
+      setDeployLogs((prev) => prev + `\n\n❌ Error: ${error.message}\n`);
       toast.error("Build failed", {
         description: error.message || "Failed to build project",
       });
-    } finally {
       setActionLoading(null);
     }
   };
 
   const handleDeploy = async () => {
     setActionLoading("deploy");
+    setShowDeployLogs(true);
+    setDeployLogs("");
+    // Reset phases
+    setDeployPhases({
+      initializing: "active",
+      building: "pending",
+      deploying: "pending",
+      cleanup: "pending",
+      postProcessing: "pending",
+    });
+    
     try {
       const auth = sessionStorage.getItem("auth");
-      const response = await fetch(`/api/projects/${projectId}/deploy`, {
-        method: "POST",
+      const response = await fetch(`/api/projects/${projectId}/deploy/stream`, {
         headers: auth ? { Authorization: `Basic ${auth}` } : {},
       });
-      
-      if (response.ok) {
-        toast.success("Deployment completed", {
-          description: `${project?.name} has been deployed successfully`,
-        });
-        await fetchProject();
-      } else {
-        const error = await response.json();
-        toast.error("Deployment failed", {
-          description: error.error || "Failed to deploy project",
-        });
+
+      if (!response.ok) {
+        throw new Error("Failed to start deployment");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let deploymentComplete = false;
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.log) {
+                const logText = data.log;
+                setDeployLogs((prev) => prev + logText);
+                
+                // Detect phase transitions
+                if (logText.includes("🛑 Stopping containers") || logText.includes("Stopping containers")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    initializing: "complete",
+                    deploying: "active",
+                  }));
+                } else if (logText.includes("🚀 Starting containers") || logText.includes("Starting containers")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    deploying: "active",
+                  }));
+                } else if (logText.includes("✅ Deployment completed") || logText.includes("Deployment completed")) {
+                  setDeployPhases((prev) => ({
+                    ...prev,
+                    deploying: "complete",
+                  }));
+                } else if (logText === "DONE") {
+                  deploymentComplete = true;
+                  setActionLoading(null);
+                  toast.success("Deployment completed", {
+                    description: `${project?.name} has been deployed successfully`,
+                  });
+                  await fetchProject();
+                  if (!isDeployModalMinimized) {
+                    setTimeout(() => {
+                      setShowDeployLogs(false);
+                    }, 2000);
+                  }
+                  return;
+                }
+                
+                // Auto-scroll to bottom
+                setTimeout(() => {
+                  const logElement = document.getElementById("deploy-logs");
+                  if (logElement) {
+                    logElement.scrollTop = logElement.scrollHeight;
+                  }
+                }, 100);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      if (!deploymentComplete) {
+        setActionLoading(null);
+        setDeployLogs((prev) => prev + "\n\n⚠️ Deployment stream ended unexpectedly\n");
       }
     } catch (error: any) {
       console.error("Error deploying:", error);
+      setDeployLogs((prev) => prev + `\n\n❌ Error: ${error.message}\n`);
       toast.error("Deployment failed", {
         description: error.message || "Failed to deploy project",
       });
-    } finally {
       setActionLoading(null);
     }
   };
@@ -1735,7 +1889,7 @@ export default function ProjectDetailPage() {
         projectDomain={project?.domain}
         deployLogs={deployLogs}
         deployPhases={deployPhases}
-        isDeploying={actionLoading === "deploy"}
+        isDeploying={actionLoading === "deploy" || actionLoading === "build"}
       />
 
 

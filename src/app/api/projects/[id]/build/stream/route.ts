@@ -49,7 +49,6 @@ export async function GET(
           try {
             const existingContent = await readFile(dockerComposePath, "utf-8");
             // Extract port (supports both SSG :80 and SSR :3000)
-            // Try SSG format first (port:80), then SSR format (port:3000)
             const ssgPortMatch = existingContent.match(/ports:\s*-\s*"(\d+):80"/);
             const ssrPortMatch = existingContent.match(/ports:\s*-\s*"(\d+):3000"/);
             if (ssgPortMatch) {
@@ -78,73 +77,38 @@ export async function GET(
           await writeDockerCompose(projectDir, projectName, repoName, port, envVars);
           sendLog("✅ docker-compose.yml regenerated\n");
         }
-        
-        sendLog("🛑 Stopping containers...\n");
 
-        // Down phase
+        sendLog("🔨 Building images...\n");
+
+        // Build phase
         await new Promise<void>((resolve, reject) => {
-          const downProcess = spawn("docker", ["compose", "down"], {
+          const buildProcess = spawn("docker", ["compose", "build"], {
             cwd: dockerComposeDir,
             shell: "/bin/sh",
           });
 
-          downProcess.stdout?.on("data", (data) => {
+          buildProcess.stdout?.on("data", (data) => {
             sendLog(data.toString());
           });
 
-          downProcess.stderr?.on("data", (data) => {
+          buildProcess.stderr?.on("data", (data) => {
             sendLog(data.toString());
           });
 
-          downProcess.on("close", (code) => {
+          buildProcess.on("close", (code) => {
             if (code === 0) {
-              sendLog("✅ Containers stopped\n");
-              resolve();
-            } else {
-              // Down can fail if containers don't exist, which is fine
-              sendLog("ℹ️  No containers to stop (this is OK)\n");
-              resolve();
-            }
-          });
-
-          downProcess.on("error", (error) => {
-            // Don't fail on down errors, just log and continue
-            sendLog(`ℹ️  Down process warning: ${error.message}\n`);
-            resolve();
-          });
-        });
-
-        sendLog("🚀 Starting containers...\n");
-
-        // Start phase
-        await new Promise<void>((resolve, reject) => {
-          const upProcess = spawn("docker", ["compose", "up", "-d"], {
-            cwd: dockerComposeDir,
-            shell: "/bin/sh",
-          });
-
-          upProcess.stdout?.on("data", (data) => {
-            sendLog(data.toString());
-          });
-
-          upProcess.stderr?.on("data", (data) => {
-            sendLog(data.toString());
-          });
-
-          upProcess.on("close", (code) => {
-            if (code === 0) {
-              sendLog("✅ Deployment completed successfully\n");
+              sendLog("✅ Build completed successfully\n");
               sendLog("DONE");
               resolve();
             } else {
-              sendLog(`❌ Deployment failed with code ${code}\n`);
+              sendLog(`❌ Build failed with code ${code}\n`);
               sendLog("DONE");
-              reject(new Error(`Deployment failed with code ${code}`));
+              reject(new Error(`Build failed with code ${code}`));
             }
           });
 
-          upProcess.on("error", (error) => {
-            sendLog(`❌ Deployment error: ${error.message}\n`);
+          buildProcess.on("error", (error) => {
+            sendLog(`❌ Build error: ${error.message}\n`);
             sendLog("DONE");
             reject(error);
           });
@@ -166,5 +130,4 @@ export async function GET(
     },
   });
 }
-
 
