@@ -80,15 +80,30 @@ export async function GET(
     const dockerComposePath = join(projectDir, "docker", "docker-compose.yml");
     try {
       const content = await readFile(dockerComposePath, "utf-8");
-      const envMatch = content.match(/environment:\s*\n((?:\s+[^:\n]+:[^\n]+\n?)+)/);
-      if (envMatch) {
-        const envLines = envMatch[1].trim().split("\n");
+      // Parse environment section from docker-compose.yml (stop at next top-level key)
+      const envStartMatch = content.match(/environment:\s*\n/);
+      if (envStartMatch) {
+        const envStartIndex = envStartMatch.index! + envStartMatch[0].length;
+        const afterEnv = content.substring(envStartIndex);
+        
+        // Find the next top-level key (starts with 2 spaces or less, followed by a key name)
+        const nextKeyMatch = afterEnv.match(/\n\s{0,2}(networks|volumes|restart|ports|build|container_name|depends_on):/);
+        const envEndIndex = nextKeyMatch ? nextKeyMatch.index! : afterEnv.length;
+        const envSection = afterEnv.substring(0, envEndIndex);
+        
+        const envLines = envSection.split("\n");
         for (const line of envLines) {
-          const match = line.trim().match(/^([^:]+):\s*(.+)$/);
+          const trimmedLine = line.trim();
+          // Skip empty lines and stop if we hit a top-level key
+          if (!trimmedLine || trimmedLine.match(/^(networks|volumes|restart|ports|build|container_name|depends_on):/)) {
+            break;
+          }
+          const match = trimmedLine.match(/^([^:]+):\s*(.+)$/);
           if (match) {
             const key = match[1].trim();
             const value = match[2].trim();
-            if (key !== "NODE_ENV") {
+            // Skip NODE_ENV and filter out invalid keys
+            if (key !== "NODE_ENV" && !['name', 'external'].includes(key.toLowerCase())) {
               productionEnvVars.set(key, value); // docker-compose.yml takes precedence
             }
           }
