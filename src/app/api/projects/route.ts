@@ -53,10 +53,6 @@ export async function GET() {
         );
 
         try {
-          const content = await readFile(dockerComposePath, "utf-8");
-          const portMatch = content.match(/ports:\s*-\s*"(\d+):/);
-          const port = portMatch ? parseInt(portMatch[1], 10) : 0;
-
           // Find repo name by looking for directories inside project dir
           const projectSubDirs = await readdir(join(baseDir, dir.name), {
             withFileTypes: true,
@@ -65,15 +61,35 @@ export async function GET() {
             (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
           );
 
+          // Check if this is a database-only project (has database but no repo)
+          const hasDatabase = projectSubDirs.some(
+            (d) => d.isDirectory() && d.name === "database"
+          );
+          const isDatabaseOnly = hasDatabase && !repoDir;
+
+          // For database-only projects, skip docker-compose.yml check
+          if (isDatabaseOnly) {
+            const status = await getProjectStatus(dir.name);
+            projectData.push({
+              name: dir.name,
+              repo: "Database Only",
+              port: 0,
+              hasDatabase: true,
+              status,
+              directory: join(baseDir, dir.name),
+            });
+            continue;
+          }
+
+          // For website projects, require docker-compose.yml
           if (!repoDir) {
             console.warn(`Skipping project ${dir.name}: no repository directory found`);
             continue;
           }
 
-          // Get status
-          const hasDatabase = projectSubDirs.some(
-            (d) => d.isDirectory() && d.name === "database"
-          );
+          const content = await readFile(dockerComposePath, "utf-8");
+          const portMatch = content.match(/ports:\s*-\s*"(\d+):/);
+          const port = portMatch ? parseInt(portMatch[1], 10) : 0;
           
           const status = await getProjectStatus(dir.name);
 
@@ -86,7 +102,29 @@ export async function GET() {
             directory: join(baseDir, dir.name),
           });
         } catch {
-          // Skip projects without docker-compose.yml
+          // Skip projects without docker-compose.yml (unless it's database-only)
+          const projectSubDirs = await readdir(join(baseDir, dir.name), {
+            withFileTypes: true,
+          }).catch(() => []);
+          const hasDatabase = projectSubDirs.some(
+            (d) => d.isDirectory() && d.name === "database"
+          );
+          const hasRepo = projectSubDirs.some(
+            (d) => d.isDirectory() && d.name !== "docker" && d.name !== "database"
+          );
+          
+          // If it's database-only, include it even without docker-compose.yml
+          if (hasDatabase && !hasRepo) {
+            const status = await getProjectStatus(dir.name);
+            projectData.push({
+              name: dir.name,
+              repo: "Database Only",
+              port: 0,
+              hasDatabase: true,
+              status,
+              directory: join(baseDir, dir.name),
+            });
+          }
         }
       }
 
@@ -114,6 +152,11 @@ export async function GET() {
       
       const gitStatusPromises = projectData.map(async (data) => {
         try {
+          // Skip git status check for database-only projects
+          if (data.repo === "Database Only") {
+            return { isBehind: false };
+          }
+          
           const projectDir = join(baseDir, data.name);
           const projectSubDirs = await readdir(projectDir, { withFileTypes: true });
           const repoDir = projectSubDirs.find(

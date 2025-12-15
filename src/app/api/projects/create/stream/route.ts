@@ -5,10 +5,11 @@ import { z } from "zod";
 import { existsSync } from "fs";
 
 const createProjectSchema = z.object({
-  repo: z.string().min(1),
+  repo: z.string().nullable().optional(),
   projectName: z.string().min(1),
-  port: z.number().int().positive(),
+  port: z.number().int().nonnegative().optional(),
   createDatabase: z.boolean(),
+  projectType: z.enum(["database-only", "database-website"]).optional().default("database-website"),
   envVars: z.array(
     z.object({
       key: z.string(),
@@ -35,39 +36,50 @@ export async function POST(request: NextRequest) {
       try {
         const body = await request.json();
         const data = createProjectSchema.parse(body);
+        const projectType = data.projectType || "database-website";
 
         const projectDir = join(config.projectsBaseDir, data.projectName);
         
-        // Check if project structure already exists (from initialize)
-        if (!existsSync(projectDir)) {
-          sendLog("❌ Error: Project structure not found. Please initialize the project first.\n");
-          sendLog("DONE");
-          controller.close();
-          return;
+        // For database-website, check if project structure already exists (from initialize)
+        if (projectType === "database-website") {
+          if (!existsSync(projectDir)) {
+            sendLog("❌ Error: Project structure not found. Please initialize the project first.\n");
+            sendLog("DONE");
+            controller.close();
+            return;
+          }
+        } else {
+          // For database-only, create project directory if it doesn't exist
+          const { createProjectDirectory } = await import("@/lib/services/filesystem.service");
+          await createProjectDirectory(data.projectName);
+          sendLog("✅ Project directory created\n");
         }
 
-        // Extract repo name
-        const repoName = data.repo.split("/").pop() || "repo";
+        // Only setup website if projectType is database-website
+        if (projectType === "database-website") {
+          // Extract repo name
+          const repoName = data.repo?.split("/").pop() || "repo";
 
-        // Regenerate Dockerfile first to detect SSG (force overwrite)
-        sendLog("📝 Regenerating Dockerfile (checking for SSG)...\n");
-        const { writeDockerfile, writeDockerCompose } = await import("@/lib/services/filesystem.service");
-        await writeDockerfile(projectDir, repoName, true);
-        sendLog("✅ Dockerfile regenerated\n");
+          // Regenerate Dockerfile first to detect SSG (force overwrite)
+          sendLog("📝 Regenerating Dockerfile (checking for SSG)...\n");
+          const { writeDockerfile, writeDockerCompose } = await import("@/lib/services/filesystem.service");
+          await writeDockerfile(projectDir, repoName, true);
+          sendLog("✅ Dockerfile regenerated\n");
 
-        sendLog("📝 Writing docker-compose.yml...\n");
+          sendLog("📝 Writing docker-compose.yml...\n");
 
-        // Write docker-compose.yml with chosen port and environment variables
-        // This will also detect SSG and use the correct port (80 for SSG, 3000 for SSR)
-        await writeDockerCompose(
-          projectDir,
-          data.projectName,
-          repoName,
-          data.port,
-          data.envVars || []
-        );
+          // Write docker-compose.yml with chosen port and environment variables
+          // This will also detect SSG and use the correct port (80 for SSG, 3000 for SSR)
+          await writeDockerCompose(
+            projectDir,
+            data.projectName,
+            repoName,
+            data.port || 3000,
+            data.envVars || []
+          );
 
-        sendLog("✅ docker-compose.yml written\n");
+          sendLog("✅ docker-compose.yml written\n");
+        }
 
         // Write database compose if needed
         if (data.createDatabase) {
@@ -116,103 +128,108 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        sendLog("🛑 Stopping containers (if any)...\n");
+        // Only deploy website if projectType is database-website
+        if (projectType === "database-website") {
+          sendLog("🛑 Stopping containers (if any)...\n");
 
-        // Deploy the project - Down phase
-        const dockerComposeDir = join(projectDir, "docker");
-        await new Promise<void>((resolve, reject) => {
-          const downProcess = spawn("docker", ["compose", "down"], {
-            cwd: dockerComposeDir,
-            shell: "/bin/sh",
-          });
+          // Deploy the project - Down phase
+          const dockerComposeDir = join(projectDir, "docker");
+          await new Promise<void>((resolve, reject) => {
+            const downProcess = spawn("docker", ["compose", "down"], {
+              cwd: dockerComposeDir,
+              shell: "/bin/sh",
+            });
 
-          downProcess.stdout?.on("data", (data) => {
-            sendLog(data.toString());
-          });
+            downProcess.stdout?.on("data", (data) => {
+              sendLog(data.toString());
+            });
 
-          downProcess.stderr?.on("data", (data) => {
-            sendLog(data.toString());
-          });
+            downProcess.stderr?.on("data", (data) => {
+              sendLog(data.toString());
+            });
 
-          downProcess.on("close", (code) => {
-            if (code === 0) {
-              sendLog("✅ Containers stopped\n");
+            downProcess.on("close", (code) => {
+              if (code === 0) {
+                sendLog("✅ Containers stopped\n");
+                resolve();
+              } else {
+                // Down can fail if containers don't exist, which is fine
+                sendLog("ℹ️  No containers to stop (this is OK)\n");
+                resolve();
+              }
+            });
+
+            downProcess.on("error", (error) => {
+              // Don't fail on down errors, just log and continue
+              sendLog(`ℹ️  Down process warning: ${error.message}\n`);
               resolve();
-            } else {
-              // Down can fail if containers don't exist, which is fine
-              sendLog("ℹ️  No containers to stop (this is OK)\n");
-              resolve();
-            }
+            });
           });
 
-          downProcess.on("error", (error) => {
-            // Don't fail on down errors, just log and continue
-            sendLog(`ℹ️  Down process warning: ${error.message}\n`);
-            resolve();
-          });
-        });
+          sendLog("🔨 Building images...\n");
 
-        sendLog("🔨 Building images...\n");
+          // Build phase
+          await new Promise<void>((resolve, reject) => {
+            const buildProcess = spawn("docker", ["compose", "build"], {
+              cwd: dockerComposeDir,
+              shell: "/bin/sh",
+            });
 
-        // Build phase
-        await new Promise<void>((resolve, reject) => {
-          const buildProcess = spawn("docker", ["compose", "build"], {
-            cwd: dockerComposeDir,
-            shell: "/bin/sh",
-          });
+            buildProcess.stdout?.on("data", (data) => {
+              sendLog(data.toString());
+            });
 
-          buildProcess.stdout?.on("data", (data) => {
-            sendLog(data.toString());
-          });
+            buildProcess.stderr?.on("data", (data) => {
+              sendLog(data.toString());
+            });
 
-          buildProcess.stderr?.on("data", (data) => {
-            sendLog(data.toString());
-          });
+            buildProcess.on("close", (code) => {
+              if (code === 0) {
+                sendLog("✅ Build completed successfully\n");
+                resolve();
+              } else {
+                reject(new Error(`Build failed with code ${code}`));
+              }
+            });
 
-          buildProcess.on("close", (code) => {
-            if (code === 0) {
-              sendLog("✅ Build completed successfully\n");
-              resolve();
-            } else {
-              reject(new Error(`Build failed with code ${code}`));
-            }
+            buildProcess.on("error", (error) => {
+              reject(error);
+            });
           });
 
-          buildProcess.on("error", (error) => {
-            reject(error);
-          });
-        });
+          sendLog("🚀 Starting containers...\n");
 
-        sendLog("🚀 Starting containers...\n");
+          // Start phase
+          await new Promise<void>((resolve, reject) => {
+            const upProcess = spawn("docker", ["compose", "up", "-d"], {
+              cwd: dockerComposeDir,
+              shell: "/bin/sh",
+            });
 
-        // Start phase
-        await new Promise<void>((resolve, reject) => {
-          const upProcess = spawn("docker", ["compose", "up", "-d"], {
-            cwd: dockerComposeDir,
-            shell: "/bin/sh",
-          });
+            upProcess.stdout?.on("data", (data) => {
+              sendLog(data.toString());
+            });
 
-          upProcess.stdout?.on("data", (data) => {
-            sendLog(data.toString());
-          });
+            upProcess.stderr?.on("data", (data) => {
+              sendLog(data.toString());
+            });
 
-          upProcess.stderr?.on("data", (data) => {
-            sendLog(data.toString());
-          });
+            upProcess.on("close", (code) => {
+              if (code === 0) {
+                sendLog("✅ Deployment completed successfully\n");
+                resolve();
+              } else {
+                reject(new Error(`Deployment failed with code ${code}`));
+              }
+            });
 
-          upProcess.on("close", (code) => {
-            if (code === 0) {
-              sendLog("✅ Deployment completed successfully\n");
-              resolve();
-            } else {
-              reject(new Error(`Deployment failed with code ${code}`));
-            }
+            upProcess.on("error", (error) => {
+              reject(error);
+            });
           });
-
-          upProcess.on("error", (error) => {
-            reject(error);
-          });
-        });
+        } else {
+          sendLog("✅ Database-only project created successfully\n");
+        }
 
         sendLog("DONE");
       } catch (error: any) {

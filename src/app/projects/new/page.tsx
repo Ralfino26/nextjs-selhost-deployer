@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Search, Star, GitFork, Lock, Globe, ArrowLeft } from "lucide-react";
+import { Loader2, Search, Star, GitFork, Lock, Globe, ArrowLeft, Database, Server } from "lucide-react";
 import { toast } from "sonner";
 import { DeployModal } from "../[id]/deploy-modal";
 
@@ -24,6 +24,8 @@ interface GitHubRepo {
   forks_count: number;
 }
 
+type ProjectType = "database-only" | "database-website";
+
 export default function NewProjectPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -33,10 +35,11 @@ export default function NewProjectPage() {
   const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
+  const [projectType, setProjectType] = useState<ProjectType>("database-website");
   const [formData, setFormData] = useState({
     projectName: "",
     port: "",
-    createDatabase: false,
+    createDatabase: true, // Always true for database-only, optional for website
   });
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [deployLogs, setDeployLogs] = useState("");
@@ -49,10 +52,14 @@ export default function NewProjectPage() {
     postProcessing: "pending" as "pending" | "active" | "complete",
   });
 
-  // Fetch GitHub repositories
+  // Fetch GitHub repositories only if website project type
   useEffect(() => {
-    fetchRepos();
-  }, []);
+    if (projectType === "database-website") {
+      fetchRepos();
+    } else {
+      setReposLoading(false);
+    }
+  }, [projectType]);
 
   // Filter repos based on search query
   useEffect(() => {
@@ -109,44 +116,59 @@ export default function NewProjectPage() {
 
   const handleContinue = async () => {
     if (step === 1) {
-      if (!selectedRepo || !formData.projectName) {
-        toast.error("Please select a repository and enter a project name");
+      if (!formData.projectName) {
+        toast.error("Please enter a project name");
         return;
       }
+      
+      // For database-website, require repo selection
+      if (projectType === "database-website" && !selectedRepo) {
+        toast.error("Please select a repository");
+        return;
+      }
+      
       setLoading(true);
       try {
-        // Initialize project structure: clone repo, create Dockerfile
-        const auth = sessionStorage.getItem("auth");
-        const response = await fetch("/api/projects/initialize", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(auth ? { Authorization: `Basic ${auth}` } : {}),
-          },
-          body: JSON.stringify({
-            repo: selectedRepo.full_name,
-            projectName: formData.projectName,
-          }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          toast.error("Error initializing project", {
-            description: error.error || "Unknown error",
+        // For database-website, initialize project structure
+        if (projectType === "database-website") {
+          const auth = sessionStorage.getItem("auth");
+          const response = await fetch("/api/projects/initialize", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(auth ? { Authorization: `Basic ${auth}` } : {}),
+            },
+            body: JSON.stringify({
+              repo: selectedRepo!.full_name,
+              projectName: formData.projectName,
+            }),
           });
-          return;
-        }
 
-        const data = await response.json();
-        // Update formData with the auto-assigned port
-        setFormData({
-          ...formData,
-          port: data.port.toString(),
-        });
+          if (!response.ok) {
+            const error = await response.json();
+            toast.error("Error initializing project", {
+              description: error.error || "Unknown error",
+            });
+            return;
+          }
+
+          const data = await response.json();
+          // Update formData with the auto-assigned port
+          setFormData({
+            ...formData,
+            port: data.port.toString(),
+          });
+        } else {
+          // For database-only, skip initialization, go directly to step 2
+          // Port is not needed for database-only projects
+        }
+        
         setStep(2);
-        toast.success("Project initialized", {
-          description: "Repository cloned and Docker files created",
-        });
+        if (projectType === "database-website") {
+          toast.success("Project initialized", {
+            description: "Repository cloned and Docker files created",
+          });
+        }
       } catch (error: any) {
         toast.error("Failed to initialize project", {
           description: error.message || "Failed to initialize project structure",
@@ -160,7 +182,7 @@ export default function NewProjectPage() {
   };
 
   const handleCreate = async () => {
-    if (!selectedRepo) return;
+    if (projectType === "database-website" && !selectedRepo) return;
     
     setLoading(true);
     setShowDeployModal(true);
@@ -168,8 +190,8 @@ export default function NewProjectPage() {
     setIsDeploying(true);
     setDeployPhases({
       initializing: "active",
-      building: "pending",
-      deploying: "pending",
+      building: projectType === "database-website" ? "pending" : "complete",
+      deploying: projectType === "database-website" ? "pending" : "complete",
       cleanup: "pending",
       postProcessing: "pending",
     });
@@ -183,10 +205,11 @@ export default function NewProjectPage() {
           ...(auth ? { Authorization: `Basic ${auth}` } : {}),
         },
         body: JSON.stringify({
-          repo: selectedRepo.full_name,
+          repo: projectType === "database-website" ? selectedRepo!.full_name : null,
           projectName: formData.projectName,
-          port: parseInt(formData.port, 10),
-          createDatabase: formData.createDatabase,
+          port: projectType === "database-website" ? parseInt(formData.port, 10) : 0,
+          createDatabase: true, // Always true for both types
+          projectType: projectType,
           envVars: [], // Environment variables can be added later via the interface
         }),
       });
@@ -285,11 +308,122 @@ export default function NewProjectPage() {
       </div>
 
       <div className="mx-auto max-w-4xl">
-        <h1 className="mb-8 text-3xl font-bold text-gray-900">New Project</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Project</h1>
+          <p className="text-gray-600">Deploy a website or create a standalone database</p>
+        </div>
 
-        {/* Step 1: Select GitHub Repo */}
-        {step === 1 && (
-          <div className="space-y-6">
+        {/* Project Type Toggle */}
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <Label className="text-base font-semibold mb-4 block">Project Type</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => {
+                setProjectType("database-only");
+                setSelectedRepo(null);
+                setFormData({ ...formData, createDatabase: true });
+              }}
+              className={`relative rounded-lg border-2 p-6 text-left transition-all ${
+                projectType === "database-only"
+                  ? "border-blue-500 bg-blue-50 shadow-md"
+                  : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+                  projectType === "database-only" ? "bg-blue-500" : "bg-gray-300"
+                }`}>
+                  <Database className={`h-6 w-6 ${
+                    projectType === "database-only" ? "text-white" : "text-gray-600"
+                  }`} />
+                </div>
+                <div className="flex-1">
+                  <h3 className={`font-semibold mb-1 ${
+                    projectType === "database-only" ? "text-blue-900" : "text-gray-900"
+                  }`}>
+                    Database Only
+                  </h3>
+                  <p className={`text-sm ${
+                    projectType === "database-only" ? "text-blue-700" : "text-gray-600"
+                  }`}>
+                    Create a standalone MongoDB database without deploying a website
+                  </p>
+                </div>
+                {projectType === "database-only" && (
+                  <div className="absolute top-4 right-4">
+                    <div className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                setProjectType("database-website");
+                setFormData({ ...formData, createDatabase: true });
+              }}
+              className={`relative rounded-lg border-2 p-6 text-left transition-all ${
+                projectType === "database-website"
+                  ? "border-blue-500 bg-blue-50 shadow-md"
+                  : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+                  projectType === "database-website" ? "bg-blue-500" : "bg-gray-300"
+                }`}>
+                  <Server className={`h-6 w-6 ${
+                    projectType === "database-website" ? "text-white" : "text-gray-600"
+                  }`} />
+                </div>
+                <div className="flex-1">
+                  <h3 className={`font-semibold mb-1 ${
+                    projectType === "database-website" ? "text-blue-900" : "text-gray-900"
+                  }`}>
+                    Database + Website
+                  </h3>
+                  <p className={`text-sm ${
+                    projectType === "database-website" ? "text-blue-700" : "text-gray-600"
+                  }`}>
+                    Deploy a website from GitHub with an optional MongoDB database
+                  </p>
+                </div>
+                {projectType === "database-website" && (
+                  <div className="absolute top-4 right-4">
+                    <div className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Project Name Input - Always Visible */}
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <Label htmlFor="projectName" className="text-base font-semibold mb-2 block">
+            Project Name
+          </Label>
+          <Input
+            id="projectName"
+            className="mt-2"
+            value={formData.projectName}
+            onChange={(e) =>
+              setFormData({ ...formData, projectName: e.target.value })
+            }
+            placeholder="my-project"
+          />
+          <p className="mt-2 text-xs text-gray-500">
+            This will be used as the container name and directory name
+          </p>
+        </div>
+
+        {/* Step 1: Select GitHub Repo (only for database-website) */}
+        {step === 1 && projectType === "database-website" && (
+          <div className="mb-6 space-y-6">
             <div className="rounded-lg border-2 border-gray-800 bg-gray-900 p-6 shadow-lg">
               <div className="mb-4 flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
@@ -313,7 +447,7 @@ export default function NewProjectPage() {
               </div>
 
               {/* Repositories List */}
-              <div className="max-h-[600px] space-y-2 overflow-y-auto rounded-md bg-gray-800 p-2">
+              <div className="max-h-[500px] space-y-2 overflow-y-auto rounded-md bg-gray-800 p-2">
                 {reposLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -380,44 +514,30 @@ export default function NewProjectPage() {
                 )}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Project Name Input */}
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-              <div>
-                <Label htmlFor="projectName" className="text-base font-medium">
-                  Project Name
-                </Label>
-                <Input
-                  id="projectName"
-                  className="mt-2"
-                  value={formData.projectName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, projectName: e.target.value })
-                  }
-                  placeholder="my-project"
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  This will be used as the container name and directory name
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                onClick={handleContinue}
-                disabled={!selectedRepo || !formData.projectName || loading}
-                className="min-w-[120px]"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Initializing...
-                  </>
-                ) : (
-                  "Continue"
-                )}
-              </Button>
-            </div>
+        {/* Continue Button */}
+        {step === 1 && (
+          <div className="flex justify-end">
+            <Button
+              onClick={handleContinue}
+              disabled={
+                !formData.projectName || 
+                (projectType === "database-website" && !selectedRepo) || 
+                loading
+              }
+              className="min-w-[120px]"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {projectType === "database-website" ? "Initializing..." : "Processing..."}
+                </>
+              ) : (
+                "Continue"
+              )}
+            </Button>
           </div>
         )}
 
@@ -425,28 +545,33 @@ export default function NewProjectPage() {
         {step === 2 && (
           <div className="space-y-6">
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-medium">Basic Configuration</h2>
+              <h2 className="mb-4 text-lg font-semibold">Configuration</h2>
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="port">Port</Label>
-                  <Input
-                    id="port"
-                    className="mt-1"
-                    value={formData.port}
-                    readOnly
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Port automatically assigned based on existing containers
-                  </p>
-                </div>
-                <div className="flex items-center justify-between rounded-md border border-gray-200 p-4">
+                {projectType === "database-website" && (
                   <div>
-                    <Label htmlFor="database" className="text-base font-medium">
-                      Create Database
-                    </Label>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Automatically create a MongoDB database for this project
+                    <Label htmlFor="port">Port</Label>
+                    <Input
+                      id="port"
+                      className="mt-1"
+                      value={formData.port}
+                      readOnly
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Port automatically assigned based on existing containers
                     </p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <Database className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <Label htmlFor="database" className="text-base font-medium">
+                        MongoDB Database
+                      </Label>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Automatically create a MongoDB database for this project
+                      </p>
+                    </div>
                   </div>
                   <Switch
                     id="database"
@@ -454,8 +579,14 @@ export default function NewProjectPage() {
                     onCheckedChange={(checked) =>
                       setFormData({ ...formData, createDatabase: checked })
                     }
+                    disabled={projectType === "database-only"}
                   />
                 </div>
+                {projectType === "database-only" && (
+                  <p className="text-xs text-gray-500 italic">
+                    Database is always created for database-only projects
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex justify-between">
@@ -480,23 +611,33 @@ export default function NewProjectPage() {
         {step === 3 && (
           <div className="space-y-6">
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-medium">Summary</h2>
+              <h2 className="mb-4 text-lg font-semibold">Summary</h2>
               <div className="space-y-3">
-                <div className="flex justify-between border-b border-gray-100 pb-2">
-                  <span className="text-gray-600">Repository:</span>
-                  <span className="font-medium">{selectedRepo?.full_name}</span>
+                <div className="flex justify-between border-b border-gray-100 pb-3">
+                  <span className="text-gray-600 font-medium">Project Type:</span>
+                  <span className="font-semibold">
+                    {projectType === "database-only" ? "Database Only" : "Database + Website"}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b border-gray-100 pb-2">
-                  <span className="text-gray-600">Project Name:</span>
-                  <span className="font-medium">{formData.projectName}</span>
+                {projectType === "database-website" && (
+                  <div className="flex justify-between border-b border-gray-100 pb-3">
+                    <span className="text-gray-600 font-medium">Repository:</span>
+                    <span className="font-semibold">{selectedRepo?.full_name || "N/A"}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-b border-gray-100 pb-3">
+                  <span className="text-gray-600 font-medium">Project Name:</span>
+                  <span className="font-semibold">{formData.projectName}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-100 pb-2">
-                  <span className="text-gray-600">Port:</span>
-                  <span className="font-medium">{formData.port}</span>
-                </div>
+                {projectType === "database-website" && (
+                  <div className="flex justify-between border-b border-gray-100 pb-3">
+                    <span className="text-gray-600 font-medium">Port:</span>
+                    <span className="font-semibold">{formData.port}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Database:</span>
-                  <span className="font-medium">
+                  <span className="text-gray-600 font-medium">Database:</span>
+                  <span className="font-semibold text-green-600">
                     {formData.createDatabase ? "Yes" : "No"}
                   </span>
                 </div>
